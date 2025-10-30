@@ -19,9 +19,13 @@ import { InvoiceService } from './services/invoice-service';
 import { PaymentService } from './services/payment-service';
 import { BalanceService } from './services/balance-service';
 import { IdempotencyService } from './services/idempotency-service';
+import { WebhookService } from './services/webhook-service';
+import { WebhookDispatcher } from './services/webhook-dispatcher';
 import { registerInvoiceRoutes } from './routes/invoices';
 import { registerPaymentRoutes } from './routes/payments';
 import { registerBalanceRoutes } from './routes/balances';
+import { registerWebhookRoutes } from './routes/webhooks';
+import { EventBus } from './events/event-bus';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const env = loadAppEnv();
@@ -70,18 +74,31 @@ export async function buildApp(): Promise<FastifyInstance> {
   const authService = new ApiKeyAuthService(prisma);
   await app.register(authPlugin, { authService });
 
+  const eventBus = new EventBus();
   const x402Adapter = new X402Adapter(env);
   const solanaAdapter = new SolanaAdapter(env);
-  const ledgerService = new LedgerService(prisma);
+  const ledgerService = new LedgerService(prisma, eventBus);
   const invoiceService = new InvoiceService(prisma, env, x402Adapter, ledgerService);
   const paymentService = new PaymentService(prisma, env, x402Adapter, solanaAdapter, ledgerService);
   const balanceService = new BalanceService(env, solanaAdapter);
+  const webhookService = new WebhookService(prisma, env);
   const idempotencyService = new IdempotencyService(redis, env.IDEMPOTENCY_TTL_SECONDS);
+
+  // initialize webhook dispatcher to react to ledger events
+  // eslint-disable-next-line no-new
+  new WebhookDispatcher({
+    prisma,
+    env,
+    eventBus,
+    webhookService,
+    ledgerService
+  });
 
   await registerHealthRoutes(app);
   await registerInvoiceRoutes(app, { invoiceService, idempotencyService });
   await registerPaymentRoutes(app, { paymentService, idempotencyService });
   await registerBalanceRoutes(app, { balanceService });
+  await registerWebhookRoutes(app, { webhookService });
 
   app.setNotFoundHandler((request, reply) => {
     return reply.status(404).send({

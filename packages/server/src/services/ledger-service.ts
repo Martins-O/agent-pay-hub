@@ -1,5 +1,6 @@
 import { PrismaClient, WebhookEventType } from '@prisma/client';
 import { generateUlid } from '../utils/id';
+import { EventBus } from '../events/event-bus';
 
 export interface LedgerEventPayload {
   type: string;
@@ -7,7 +8,7 @@ export interface LedgerEventPayload {
 }
 
 export class LedgerService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaClient, private readonly eventBus: EventBus) {}
 
   async recordEvent(params: {
     type: WebhookEventType;
@@ -17,7 +18,7 @@ export class LedgerService {
   }): Promise<string> {
     const eventId = generateUlid();
 
-    await this.prisma.ledgerEvent.create({
+    const created = await this.prisma.ledgerEvent.create({
       data: {
         id: eventId,
         invoiceId: params.invoiceId,
@@ -26,7 +27,14 @@ export class LedgerService {
         payload: params.payload
       }
     });
-
+    this.eventBus.publishLedgerEvent({
+      id: created.id,
+      eventType: created.eventType,
+      invoiceId: created.invoiceId,
+      paymentId: created.paymentId,
+      createdAt: created.createdAt,
+      payload: created.payload as Record<string, unknown>
+    });
     return eventId;
   }
 }
