@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  EXPIRED
+  CANCELED
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+}
+
+enum WebhookEventType {
+  INVOICE_CREATED
+  INVOICE_EXPIRED
+  PAYMENT_SUBMITTED
+  PAYMENT_CONFIRMED
+  WEBHOOK_DELIVERY_SUCCEEDED
+  WEBHOOK_DELIVERY_FAILED
+}
+
+enum AuditActionCategory {
+  ADMIN
+  SECURITY
+  BILLING
+  OPERATIONS
+}
+
+model Agent {
+  id              String               @id
+  apiKeyPrefix    String               @unique
+  apiKeyHash      String
+  rateLimitBucket Int
+  allowedScopes   String[]
+  createdAt       DateTime             @default(now())
+  lastActive      DateTime?
+  invoices        Invoice[]
+  payments        Payment[]            @relation("PaymentSubmittedBy")
+  webhookRegs     WebhookRegistration[]
+  auditLogs       AuditLog[]
+}
+
+model Invoice {
+  id                  String        @id
+  creatorAgentId      String
+  creatorAgent        Agent         @relation(fields: [creatorAgentId], references: [id])
+  payerWalletAddress  String?
+  recipientWalletAddress String
+  assetSymbol         String
+  amount              Decimal        @db.Decimal(65, 18)
+  currencyPrecision   Int
+  memo                String?
+  createdAt           DateTime       @default(now())
+  expiry              DateTime?
+  status              InvoiceStatus  @default(OPEN)
+  x402Intent          String
+  nonce               String
+  paymentRequestUri   String
+  shortCode           String
+  updatedAt           DateTime       @updatedAt
+  canceledAt          DateTime?
+  payments            Payment[]
+  ledgerEvents        LedgerEvent[]
+
+  @@index([creatorAgentId])
+  @@index([status])
+  @@unique([shortCode])
+}
+
+model Payment {
+  id                  String        @id
+  invoiceId           String
+  invoice             Invoice       @relation(fields: [invoiceId], references: [id])
+  submittedById       String
+  submittedBy         Agent         @relation("PaymentSubmittedBy", fields: [submittedById], references: [id])
+  payerWalletAddress  String
+  recipientWalletAddress String
+  onChainSignature    String
+  slot                BigInt?
+  confirmationStatus  PaymentStatus @default(PENDING)
+  feeEstimateLamports BigInt?
+  feeActualLamports   BigInt?
+  errorCode           String?
+  createdAt           DateTime      @default(now())
+  submittedAt         DateTime?
+  confirmedAt         DateTime?
+  updatedAt           DateTime      @updatedAt
+  simulationLogs      Json?
+  ledgerEvents        LedgerEvent[]
+
+  @@index([invoiceId])
+  @@index([confirmationStatus])
+}
+
+model WebhookRegistration {
+  id                String             @id
+  ownerAgentId      String
+  ownerAgent        Agent              @relation(fields: [ownerAgentId], references: [id])
+  targetUrl         String
+  sharedSecretHash  String
+  sharedSecretCiphertext String
+  eventFilter       String[]
+  active            Boolean            @default(true)
+  verificationNonce String
+  lastDeliveryAt    DateTime?
+  failureCount      Int                @default(0)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deliveryAttempts  DeliveryAttempt[]
+
+  @@index([ownerAgentId])
+  @@index([active])
+}
+
+model DeliveryAttempt {
+  id               String   @id
+  registrationId   String
+  registration     WebhookRegistration @relation(fields: [registrationId], references: [id])
+  ledgerEventId    String
+  ledgerEvent      LedgerEvent @relation(fields: [ledgerEventId], references: [id])
+  attemptNumber    Int
+  requestBodyHash  String
+  responseStatus   Int?
+  latencyMs        Int?
+  failureReason    String?
+  signatureUsed    String?
+  createdAt        DateTime @default(now())
+
+  @@unique([ledgerEventId, attemptNumber])
+  @@index([registrationId])
+  @@index([ledgerEventId])
+}
+
+model LedgerEvent {
+  id            String           @id
+  invoiceId     String?
+  invoice       Invoice?         @relation(fields: [invoiceId], references: [id])
+  paymentId     String?
+  payment       Payment?         @relation(fields: [paymentId], references: [id])
+  eventType     WebhookEventType
+  payload       Json
+  createdAt     DateTime         @default(now())
+  webhookAttempts DeliveryAttempt[]
+
+  @@index([eventType])
+}
+
+model AuditLog {
+  id          String               @id
+  agentId     String?
+  agent       Agent?               @relation(fields: [agentId], references: [id])
+  category    AuditActionCategory
+  action      String
+  context     Json
+  createdAt   DateTime             @default(now())
+}

@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "lib": ["ES2021", "DOM"],
+    "types": [],
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@agentpay/types": ["packages/types/src"],
+      "@agentpay/server/*": ["packages/server/src/*"],
+      "@agentpay/sdk": ["packages/sdk/src"],
+      "@agentpay/dashboard/*": ["packages/dashboard/src/*"]
+    }
+  }
+}
