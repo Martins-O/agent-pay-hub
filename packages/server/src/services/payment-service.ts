@@ -278,7 +278,11 @@ export class PaymentService {
       maxFeeLamports
     });
 
-    const confirmation = await this.solana.confirmTransaction(submission.signature);
+    const confirmation = await this.solana.confirmTransaction(
+      submission.signature,
+      submission.blockhash,
+      submission.lastValidBlockHeight
+    );
 
     submittedPayment = await this.prisma.payment.update({
       where: { id: submittedPayment.id },

@@ -76,6 +76,7 @@ const EnvSchema = z.object({
     .default('confirmed'),
   SOLANA_TX_TIMEOUT_MS: z.coerce.number().int().positive().default(60000),
   SOLANA_SIMULATION_ONLY: booleanSchema.default(true),
+  SOLANA_PAYER_SECRET: z.string().min(1).optional(),
   DEVNET_FAUCET_ADDRESS: z.string().min(1, 'DEVNET_FAUCET_ADDRESS is required'),
   ALLOWED_ASSETS: z
     .unknown()
@@ -105,6 +106,10 @@ export function loadAppEnv(): AppEnv {
       .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
       .join(', ');
     throw new Error(`Environment validation failed: ${message}`);
+  }
+
+  if (!parsed.data.SOLANA_SIMULATION_ONLY && !parsed.data.SOLANA_PAYER_SECRET) {
+    throw new Error('SOLANA_PAYER_SECRET is required when SOLANA_SIMULATION_ONLY=false');
   }
 
   cachedEnv = parsed.data;

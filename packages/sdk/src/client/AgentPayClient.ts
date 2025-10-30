@@ -159,6 +159,17 @@ export class AgentPayClient {
     });
   }
 
+  async *iterateWebhooks(params: { limit?: number } = {}): AsyncGenerator<WebhookRegistration, void, unknown> {
+    let cursor: string | undefined;
+    do {
+      const page = await this.listWebhooks({ cursor, limit: params.limit });
+      for (const webhook of page.webhooks) {
+        yield webhook;
+      }
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
+  }
+
   async deleteWebhook(webhookId: string): Promise<DeleteWebhookResponse> {
     return this.http.request({
       method: 'DELETE',
