@@ -18,6 +18,6 @@ This document will enumerate every MCP server endpoint, request/response schema,
   - `GET /v1/events/:eventId/deliveries` – inspect delivery attempts for a specific event.
   - Support endpoints for health, metrics, readiness.
 - **Events & Webhooks**: payload schemas for `invoice.created`, `invoice.expired`, `payment.submitted`, `payment.confirmed`, `webhook.delivery.succeeded`, `webhook.delivery.failed`.
-- **Examples**: cURL + SDK usage snippets.
+- **Examples**: cURL + SDK usage snippets (see README `SDK Usage` preview for quickstart).
 
 Detailed tables with field descriptions will be completed after DTOs are implemented in shared types.

@@ -14,3 +14,34 @@ AgentPay Hub is an open-source MCP server that enables AI agents to create invoi
 
 ## Getting Started
 Detailed setup instructions, local-run scripts, and documentation will be added as the build progresses. Refer to `docs/architecture.md` for the planned system design.
+
+## SDK Usage (Preview)
+```ts
+import { AgentPayClient, verifyWebhookSignature } from '@agentpay/sdk';
+
+const client = new AgentPayClient({
+  baseUrl: process.env.AGENTPAY_URL!,
+  apiKey: process.env.AGENTPAY_API_KEY!
+});
+
+const { invoice } = await client.createInvoice({
+  recipientWalletAddress: 'RecipientPubkey',
+  assetSymbol: 'USDC',
+  amount: '1.50',
+  memo: 'Sample invoice'
+});
+
+for await (const webhook of client.iterateWebhooks({ limit: 25 })) {
+  console.log('Registered webhook', webhook.id);
+}
+
+function handleWebhook(headers: Record<string, string>, body: string) {
+  const valid = verifyWebhookSignature({
+    secret: process.env.AGENTPAY_WEBHOOK_SECRET!,
+    timestamp: headers['x-agentpay-timestamp'],
+    signature: headers['x-agentpay-signature'],
+    body
+  });
+  if (!valid) throw new Error('Invalid webhook signature');
+}
+```

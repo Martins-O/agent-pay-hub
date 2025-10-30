@@ -29,7 +29,7 @@ This log captures the current build state against the hackathon charter. It is m
   - Route: `GET /v1/balances/:walletAddress?asset=SYMBOL`.
 - **x402 & Solana Adapters**
   - x402 adapter for intent encode/decode, URI building, nonce generation.
-  - Solana adapter scaffold with simulation-only execution, signature stubs, and balance lookups.
+  - Solana adapter supports simulation-only mode and, when enabled, full transaction assembly, signing (via `SOLANA_PAYER_SECRET`), submission, confirmation polling, memo support, and fee estimation.
 - **Ledger & Eventing**
   - Ledger service records events and publishes to in-process `EventBus` abstraction.
   - Event bus wired to webhook dispatcher.
@@ -42,6 +42,9 @@ This log captures the current build state against the hackathon charter. It is m
   - Shared `AgentPayError` mapping server error envelopes, plus webhook signature verification helper using HMAC-SHA256.
 - **Documentation & Tracking**
   - Architecture, environment variable catalog, execution plan, acceptance criteria, test plan outline, demo script outline, and README status updated.
+  - README includes SDK usage preview; API reference cross-links SDK examples.
+- **Testing (SDK)**
+  - Vitest configuration and unit coverage for HTTP client, idempotency helper, and webhook signature verifier (execution pending dependency install due to sandbox limits).
 
 ## 🚧 In Progress / Remaining
 
@@ -61,10 +64,10 @@ This log captures the current build state against the hackathon charter. It is m
 - **Dashboard**
   - Build React/Vite dashboard flows (auth, invoice creation, payment simulation, webhook delivery viewer) leveraging shared SDK/types.
 - **Tests**
-  - Unit tests: schema validation, error mapper, idempotency cache, crypto helpers, webhook signature verification.
+  - Unit tests: schema validation, error mapper, idempotency cache, crypto helpers, webhook signature verification (server side).
   - Integration tests: invoice lifecycle, payment flow (simulation + confirm), balance query, webhook registration + delivery (mock HTTP sink).
   - Devnet chain tests for positive/negative payment cases once Solana adapter is real.
-  - SDK tests (fetch mocks, retries) and dashboard e2e flows.
+  - SDK integration tests (HTTP retries, pagination helpers) and dashboard e2e flows.
   - Configure coverage thresholds and gating in CI.
 - **CI / DevOps**
   - Add lint/typecheck/test/build steps in CI, container build/smoke, artifact uploads, and SDK package publish step.
@@ -85,5 +88,6 @@ This log captures the current build state against the hackathon charter. It is m
 - `SOLANA_SIMULATION_ONLY` defaults to `true` to protect local development until real signing/funding is wired.
 - Webhook dispatcher currently uses `setTimeout` for backoff; production deployment should move to a job queue or worker for resilience.
 - Invoice/payment services currently operate under optimistic concurrency; database constraints and unique indexes for idempotent tokens still need to be added.
+- SDK unit tests rely on pnpm install; execution is pending until registry access is available in the sandbox.
 
 Update this file whenever a feature moves from “Remaining” to “Completed” or when new gaps are identified.
