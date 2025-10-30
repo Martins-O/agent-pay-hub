@@ -36,6 +36,8 @@ export const registerWebhookResponseSchema = z.object({
   verificationChallenge: z.string()
 });
 
+export type RegisterWebhookResponse = z.infer<typeof registerWebhookResponseSchema>;
+
 export const listWebhooksResponseSchema = z.object({
   webhooks: z.array(webhookRegistrationSchema),
   nextCursor: z.string().nullable()
@@ -44,6 +46,8 @@ export const listWebhooksResponseSchema = z.object({
 export const deleteWebhookResponseSchema = z.object({
   success: z.boolean()
 });
+
+export type DeleteWebhookResponse = z.infer<typeof deleteWebhookResponseSchema>;
 
 export const deliveryAttemptSchema = z.object({
   id: ulidSchema,
@@ -60,6 +64,8 @@ export const deliveryAttemptSchema = z.object({
 export const getDeliveryAttemptsResponseSchema = z.object({
   attempts: z.array(deliveryAttemptSchema)
 });
+
+export type GetDeliveryAttemptsResponse = z.infer<typeof getDeliveryAttemptsResponseSchema>;
 
 export const webhookEventPayloadSchema = z.discriminatedUnion('type', [
   z.object({

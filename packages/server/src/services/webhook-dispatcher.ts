@@ -8,6 +8,7 @@ import { createWebhookSignature } from '../utils/crypto';
 import { AgentPayError } from '../errors/agentpay-error';
 import { createHash } from 'node:crypto';
 import { fetch } from 'undici';
+import { generateUlid } from '../utils/id';
 
 export interface WebhookDispatcherOptions {
   prisma: PrismaClient;
@@ -166,7 +167,7 @@ export class WebhookDispatcher {
 
     await this.prisma.deliveryAttempt.create({
       data: {
-        id: generateAttemptId(eventId, attempt),
+        id: generateUlid(),
         registrationId,
         ledgerEventId: eventId,
         attemptNumber: attempt,
@@ -234,8 +235,4 @@ export class WebhookDispatcher {
       }
     });
   }
-}
-
-function generateAttemptId(eventId: string, attempt: number): string {
-  return `${eventId}-${attempt}`;
 }

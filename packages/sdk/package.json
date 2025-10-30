@@ -16,7 +16,11 @@
     "typecheck": "tsc -p tsconfig.build.json --noEmit"
   },
   "dependencies": {
-    "cross-fetch": "^3.1.8"
+    "@agentpay/types": "workspace:*",
+    "@noble/hashes": "^1.4.0",
+    "cross-fetch": "^3.1.8",
+    "ulid": "^2.3.0",
+    "zod": "^3.22.4"
   },
   "devDependencies": {}
 }

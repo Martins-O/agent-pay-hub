@@ -12,10 +12,10 @@ This document will enumerate every MCP server endpoint, request/response schema,
   - `GET /v1/payments/:id` – fetch payment.
   - `GET /v1/balances/:wallet` – balance query.
   - `POST /v1/webhooks` – register webhook.
+  - `POST /v1/webhooks/:id/verify` – activate webhook registration using verification challenge.
   - `GET /v1/webhooks` – list webhooks with pagination.
-  - `DELETE /v1/webhooks/:id` – delete webhook.
-  - `GET /v1/webhooks/:id/deliveries` – list delivery attempts.
-  - `POST /v1/webhooks/verify` – webhook verification challenge response.
+  - `DELETE /v1/webhooks/:id` – deactivate webhook.
+  - `GET /v1/events/:eventId/deliveries` – inspect delivery attempts for a specific event.
   - Support endpoints for health, metrics, readiness.
 - **Events & Webhooks**: payload schemas for `invoice.created`, `invoice.expired`, `payment.submitted`, `payment.confirmed`, `webhook.delivery.succeeded`, `webhook.delivery.failed`.
 - **Examples**: cURL + SDK usage snippets.

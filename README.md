@@ -7,7 +7,7 @@ AgentPay Hub is an open-source MCP server that enables AI agents to create invoi
 - [x] Environment variable catalog drafted (`docs/environment.md`).
 - [x] Repository scaffolding (`packages/` for server, sdk, dashboard, types).
 - [x] Core server foundation (config loader, auth skeleton, rate limiting, health endpoints, persistence schema).
-- [x] Invoice, payment, and balance API scaffolding with ledger + idempotency plumbing.
+- [x] Invoice, payment, balance, and webhook API scaffolding with ledger + idempotency + dispatcher plumbing.
 - [ ] Webhook dispatcher, Solana submission/confirmation lifecycle, and ledger projections.
 - [ ] SDK, dashboard, webhooks, and Solana integration.
 - [ ] Tests, CI, documentation suite, and demo assets.
