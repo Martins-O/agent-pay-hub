@@ -37,18 +37,18 @@ This log captures the current build state against the hackathon charter. It is m
   - Webhook service covering registration (with verification challenge), verification, listing (cursor pagination), soft deletion, delivery-attempt querying, and secret escrow (AES-GCM) + Argon2 hashing.
   - Webhook dispatcher listens to ledger events and delivers HMAC-signed payloads with exponential backoff, logging delivery attempts, and emitting success/failure events.
   - Routes: `POST /v1/webhooks`, `POST /v1/webhooks/:id/verify`, `GET /v1/webhooks`, `DELETE /v1/webhooks/:id`, `GET /v1/events/:eventId/deliveries`.
+- **TypeScript SDK**
+  - `AgentPayClient` with typed helpers for invoices, payments, balances, and webhook management, idempotency key generation, and response validation.
+  - Shared `AgentPayError` mapping server error envelopes, plus webhook signature verification helper using HMAC-SHA256.
 - **Documentation & Tracking**
   - Architecture, environment variable catalog, execution plan, acceptance criteria, test plan outline, demo script outline, and README status updated.
 
 ## 🚧 In Progress / Remaining
 
-- **Solana Integration**
-  - Implement real transaction simulation/submit/confirm logic, wallet signer management, fee accounting, and error mapping in `SolanaAdapter`.
-  - Add support for commitment polling, timeout handling, multi-RPC failover, and signature verification.
-- **Payments Enhancements**
-  - Attach real on-chain signature, slot, fee metrics once Solana adapter is complete.
-  - Handle idempotent replay of confirmed and pending payments (dedupe logic) and integrate idempotency keys at database level.
-  - Add invoice expiry daemon to transition OPEN→EXPIRED and emit events.
+- **Solana & Payments Integration**
+  - Wire real transaction simulation/submit/confirm logic, wallet signer management, fee accounting, and error mapping into `SolanaAdapter`.
+  - Support commitment polling, timeout handling, multi-RPC failover, signature verification, and invoice expiry daemon based on on-chain state.
+  - Persist idempotency tokens/locks at the database layer to dedupe payment submissions and confirmed statuses.
 - **Webhooks**
   - Add webhook verification response endpoint (if required by external consumers) and optional handshake logging.
   - Persist DLQ or manual replay controls; expose admin route to trigger replays.
@@ -56,8 +56,8 @@ This log captures the current build state against the hackathon charter. It is m
 - **Ledger & Observability**
   - Expand ledger projections for balances/audit trail, add metrics exporters (Prometheus), and hook in tracing spans.
 - **SDK**
-  - Implement TypeScript client with typed methods for all endpoints, retries, webhook signature verifier, and idempotency helpers.
-  - Publish local package, create examples and docs.
+  - Add higher-level ergonomics (stream helpers, pagination iterators) and publish-ready metadata.
+  - Provide usage examples, docs, and automated tests (unit + integration) before packaging.
 - **Dashboard**
   - Build React/Vite dashboard flows (auth, invoice creation, payment simulation, webhook delivery viewer) leveraging shared SDK/types.
 - **Tests**

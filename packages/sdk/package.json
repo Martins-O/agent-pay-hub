@@ -12,7 +12,7 @@
     "dev": "tsc -p tsconfig.build.json --watch",
     "format": "prettier --write 'src/**/*.ts'",
     "lint": "eslint 'src/**/*.ts'",
-    "test": "vitest",
+    "test": "vitest run",
     "typecheck": "tsc -p tsconfig.build.json --noEmit"
   },
   "dependencies": {
@@ -22,5 +22,14 @@
     "ulid": "^2.3.0",
     "zod": "^3.22.4"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "vitest": "^1.5.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "description": "TypeScript client SDK for AgentPay Hub",
+  "keywords": ["solana", "payments", "agent", "sdk"],
+  "license": "MIT"
 }
