@@ -2,9 +2,14 @@ import fp from 'fastify-plugin';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { ApiKeyAuthService, AgentIdentity } from '../auth/api-key-service';
 import { AgentPayError } from '../errors/agentpay-error';
+import { WalletSignatureService } from '../services/wallet-signature-service';
+import { NonceService } from '../services/nonce-service';
+import { WalletAuthContext } from '../auth/types';
 
 export interface AuthPluginOptions {
   authService: ApiKeyAuthService;
+  walletSignatureService: WalletSignatureService;
+  nonceService: NonceService;
 }
 
 declare module 'fastify' {
@@ -14,16 +19,29 @@ declare module 'fastify' {
 
   interface FastifyRequest {
     agent?: AgentIdentity;
+    walletIdentity?: WalletAuthContext;
   }
 }
 
+function extractHeader(headers: FastifyRequest['headers'], name: string): string | undefined {
+  const normalized = name.toLowerCase();
+  const candidate = (headers as Record<string, string | string[] | undefined>)[normalized];
+  if (typeof candidate === 'string') {
+    return candidate;
+  }
+  if (Array.isArray(candidate) && candidate.length > 0) {
+    return candidate[0];
+  }
+  return undefined;
+}
+
 export default fp<AuthPluginOptions>(async function authPlugin(app: FastifyInstance, opts) {
-  const { authService } = opts;
+  const { authService, walletSignatureService, nonceService } = opts;
 
   app.decorate('authenticate', async (request: FastifyRequest) => {
-    const apiKeyHeader = request.headers['x-api-key'];
+    const apiKeyHeader = extractHeader(request.headers, 'x-api-key');
 
-    if (!apiKeyHeader || typeof apiKeyHeader !== 'string') {
+    if (!apiKeyHeader) {
       throw new AgentPayError({
         statusCode: 401,
         code: 'AUTH_MISSING_API_KEY',
@@ -43,5 +61,64 @@ export default fp<AuthPluginOptions>(async function authPlugin(app: FastifyInsta
     }
 
     await app.authenticate(request, reply);
+  });
+
+  app.addHook('preHandler', async (request, reply) => {
+    const routeConfig = request.routeOptions?.config as { public?: boolean } | undefined;
+
+    if (routeConfig?.public) {
+      return;
+    }
+
+    const walletAddress = extractHeader(request.headers, 'x-wallet-address');
+    const walletSignature = extractHeader(request.headers, 'x-wallet-signature');
+    const walletNonce = extractHeader(request.headers, 'x-wallet-nonce');
+    const walletTimestamp = extractHeader(request.headers, 'x-wallet-timestamp');
+
+    const provided = [walletAddress, walletSignature, walletNonce, walletTimestamp].filter(
+      (value) => typeof value === 'string'
+    ).length;
+
+    if (provided === 0) {
+      return;
+    }
+
+    if (!walletAddress || !walletSignature || !walletNonce || !walletTimestamp) {
+      throw new AgentPayError({
+        statusCode: 401,
+        code: 'AUTH_INVALID_SIGNATURE',
+        message: 'Wallet signature requires address, signature, nonce, and timestamp headers.'
+      });
+    }
+
+    const agent = request.agent;
+
+    if (!agent) {
+      throw new AgentPayError({
+        statusCode: 401,
+        code: 'AUTH_INVALID_SIGNATURE',
+        message: 'Agent context missing for wallet signature validation.'
+      });
+    }
+
+    const path = request.raw.url ?? request.url;
+
+    await walletSignatureService.verifySignature({
+      walletAddress,
+      nonce: walletNonce,
+      timestamp: walletTimestamp,
+      signature: walletSignature,
+      method: request.method,
+      path,
+      body: request.body
+    });
+
+    await nonceService.consume(agent.id, walletAddress, walletNonce);
+
+    request.walletIdentity = {
+      walletAddress,
+      nonce: walletNonce,
+      timestamp: walletTimestamp
+    };
   });
 });

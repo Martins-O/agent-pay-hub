@@ -22,6 +22,8 @@ import { BalanceService } from './services/balance-service';
 import { IdempotencyService } from './services/idempotency-service';
 import { WebhookService } from './services/webhook-service';
 import { WebhookDispatcher } from './services/webhook-dispatcher';
+import { WalletSignatureService } from './services/wallet-signature-service';
+import { NonceService } from './services/nonce-service';
 import { registerInvoiceRoutes } from './routes/invoices';
 import { registerPaymentRoutes } from './routes/payments';
 import { registerBalanceRoutes } from './routes/balances';
@@ -75,7 +77,13 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   const authService = new ApiKeyAuthService(prisma);
-  await app.register(authPlugin, { authService });
+  const walletSignatureService = new WalletSignatureService();
+  const nonceService = new NonceService(redis, env.CACHE_NAMESPACE_TTL_NONCE);
+  await app.register(authPlugin, {
+    authService,
+    walletSignatureService,
+    nonceService
+  });
 
   const eventBus = new EventBus();
   const x402Adapter = new X402Adapter(env);

@@ -27,6 +27,7 @@
     "@prisma/client": "^5.14.0",
     "@solana/web3.js": "^1.92.5",
     "argon2": "^0.44.0",
+    "@noble/ed25519": "^2.1.0",
     "dotenv": "^16.4.5",
     "fastify": "^4.26.2",
     "fastify-plugin": "^4.5.1",

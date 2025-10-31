@@ -2,7 +2,10 @@
 
 This document will enumerate every MCP server endpoint, request/response schema, authentication requirements, idempotency behavior, rate limits, and error semantics. The structure will include:
 
-- **Authentication**: API key header, optional wallet signature procedure, nonce rules, example canonical string.
+- **Authentication**: API key header (`x-api-key`) with optional wallet signature extension.
+  - Wallet signature headers: `x-wallet-address`, `x-wallet-signature`, `x-wallet-nonce`, `x-wallet-timestamp`.
+  - Canonical string: `<wallet>.<nonce>.<timestamp>.<HTTP_METHOD>.<PATH>.<sha256(body)>` signed using the Solana wallet private key (base58 signatures).
+  - Nonces are single-use; replay attempts within `CACHE_NAMESPACE_TTL_NONCE` are rejected.
 - **Error Envelope**: `code`, `message`, `details`, `correlationId`, `retryable` flag.
 - **Endpoints**:
   - `POST /v1/invoices` – create invoice.

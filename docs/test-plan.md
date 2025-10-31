@@ -7,6 +7,7 @@ The final test plan will enumerate unit, integration, chain, SDK, and end-to-end
   - Error envelope and mapper functions.
   - Rate limiter, nonce cache, idempotency store.
   - Webhook signature utilities and HMAC verifier.
+  - Wallet signature canonical string builder and nonce consumption edge cases.
 - **Integration Tests**
   - Invoice lifecycle (create, fetch, cancel, expire).
   - Payment simulation + submission path.

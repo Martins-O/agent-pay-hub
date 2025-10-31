@@ -18,6 +18,7 @@ This log captures the current build state against the hackathon charter. It is m
 - **Authentication & Idempotency**
   - API key authentication service using Argon2 hashed prefixes, integrated with Fastify lifecycle.
   - Idempotency service using Redis (per-agent key namespace) applied to invoice and payment POST endpoints.
+  - Optional wallet signature verification with replay-protected nonce cache (Redis-backed) and timestamp drift guards.
 - **Invoice Domain**
   - Invoice service supporting create/get/cancel with validation, asset allow-list checks, amount guards, status transitions, x402 intent generation, and ledger event emission.
   - Routes: `POST /v1/invoices`, `GET /v1/invoices/:id`, `POST /v1/invoices/:id/cancel` with DTO validation and idempotency.
@@ -78,7 +79,7 @@ This log captures the current build state against the hackathon charter. It is m
   - Flesh out INSTALL guide, API reference with request/response tables, architecture guide narrative, security notes (STRIDE), contributing guide, changelog entries.
   - Prepare demo script, record video, document submission artifacts, devnet addresses, and next-steps issue list.
 - **Security & Ops**
-  - Threat model documentation, secrets handling guidance, nonce/timestamp replay cache, rate limit tuning, audit log entries for sensitive actions.
+  - Threat model documentation, secrets handling guidance, documenting nonce/timestamp replay cache behavior, rate limit tuning, audit log entries for sensitive actions.
   - Key rotation procedures for API keys and webhook secrets, plus environment rotation process.
 - **Future Enhancements / Known gaps**
   - WebSocket streaming or SSE for real-time dashboard updates.
