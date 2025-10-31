@@ -1,11 +1,46 @@
-# Install & Setup Guide (Work in Progress)
+# Install & Setup Guide
 
-Full installation instructions, environment configuration steps, local run scripts, and container usage notes will be populated as implementation proceeds. The final guide will include:
+## Prerequisites
 
-1. Prerequisites (Node, pnpm, Docker, Solana CLI, etc.).
-2. Environment configuration using provided `.env.example` files.
-3. Single-command local bootstrap script covering database, cache, dev agent seeding, and devnet wallet funding.
-4. Running the MCP server, SDK package build/watch, and dashboard.
-5. Troubleshooting tips for common setup issues.
+- Node.js 20.x
+- pnpm 8.15.4 (the repo is configured with `packageManager: "pnpm@8.15.4"`)
+- Docker Desktop (or Docker Engine) with Docker Compose
+- Access to the public Solana devnet (default RPC: `https://api.devnet.solana.com`)
 
-For the projected architecture and component responsibilities, see `docs/architecture.md`.
+## Bootstrap the Workspace
+
+1. Clone the repository and install dependencies:
+   ```bash
+   pnpm install
+   ```
+2. Copy the provided environment templates or let the helper script do it for you:
+   ```bash
+   bash scripts/bootstrap-dev.sh
+   ```
+   - Copies `.env.example` → `.env` for server, sdk, and dashboard packages if they are missing.
+   - Starts Postgres (port 5432) and Redis (port 6379) in Docker.
+   - Applies Prisma migrations and seeds a development agent/API key.
+3. (Optional) Tear everything down when finished:
+   ```bash
+   bash scripts/teardown-dev.sh
+   ```
+
+## Running the Stack
+
+- Launch all packages in watch mode: `pnpm dev`
+- Run only the server: `pnpm --filter @agentpay/server dev`
+- The Fastify server listens on `http://localhost:8080`.
+
+## Quality Checks
+
+- Lint all packages: `pnpm lint`
+- Execute tests: `pnpm test`
+- Type-check everything: `pnpm typecheck`
+
+## Troubleshooting
+
+- **Missing dependencies** – rerun `pnpm install` to restore the workspace `node_modules` directory.
+- **Database connection errors** – ensure the Docker containers are running (`docker compose ps`).
+- **Regenerate seed credentials** – delete the existing agent record and rerun `pnpm --dir packages/server prisma db seed`.
+
+Refer to `docs/architecture.md` for deeper context on the system design.

@@ -16,7 +16,26 @@ AgentPay Hub is an open-source MCP server that enables AI agents to create invoi
 - [ ] Tests, CI, documentation suite, and demo assets.
 
 ## Getting Started
-Detailed setup instructions, local-run scripts, and documentation will be added as the build progresses. Refer to `docs/architecture.md` for the planned system design.
+
+### Local Development
+
+1. Install prerequisites: Node.js 20, pnpm 8.15.4, Docker, and Docker Compose.
+2. Bootstrap the workspace:
+   ```bash
+   bash scripts/bootstrap-dev.sh
+   ```
+   The script copies `.env.example` files, starts Postgres + Redis via Docker, applies Prisma migrations, and seeds a development API key. The generated key (if one was created) is echoed to the console.
+3. Start the packages in watch mode:
+   ```bash
+   pnpm dev
+   ```
+   The server binds to `http://localhost:8080` with simulation-only Solana behavior by default.
+
+### Quality Gates
+
+- Run the server test suite: `pnpm --filter @agentpay/server test`
+- Run all workspace tests/lints/type checks: `pnpm test`, `pnpm lint`, `pnpm typecheck`
+- CI (GitHub Actions) executes the same commands on every push and pull request.
 
 ## SDK Usage (Preview)
 ```ts

@@ -1,4 +1,4 @@
-import { verify } from '@noble/ed25519';
+import { verifyAsync } from '@noble/ed25519';
 import bs58 from 'bs58';
 import { createHash } from 'node:crypto';
 import { Buffer } from 'node:buffer';
@@ -85,7 +85,7 @@ export class WalletSignatureService {
       });
     }
 
-    const verified = await verify(signatureBytes, messageBytes, publicKeyBytes).catch(() => false);
+    const verified = await verifyAsync(signatureBytes, messageBytes, publicKeyBytes).catch(() => false);
 
     if (!verified) {
       throw new AgentPayError({

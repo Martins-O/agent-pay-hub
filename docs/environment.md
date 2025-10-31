@@ -44,10 +44,10 @@ The following environment variables are required across packages. Example values
 - `SESSION_SECRET`: Secret for dashboard session cookies (if auth is session-based).
 
 ## Tooling / Scripts
-- `SEED_AGENT_NAME`: Friendly identifier for seeded dev agent.
-- `SEED_AGENT_EMAIL`: Contact email for dev agent records.
-- `SEED_AGENT_API_KEY`: API key provisioned during local setup.
-- `SEED_AGENT_API_SECRET`: Plaintext secret used to generate hashed key.
+- `SEED_AGENT_ID`: Optional ULID to assign to the seeded development agent (defaults to a generated ULID).
+- `SEED_AGENT_API_KEY`: Full API key (`prefix.secret`) provisioned during local setup. Generated automatically when omitted.
+- `SEED_AGENT_SCOPES`: JSON array or comma-separated list of scopes granted to the seed agent (defaults to `[*]`).
+- `SEED_AGENT_RATE_LIMIT_BUCKET`: Overrides the agent-specific rate limit bucket size.
 - `DEV_WALLET_MNEMONIC`: Local mnemonic for dev wallet (devnet only).
 - `CI`: Flag toggled in CI environment to enforce non-interactive behavior.
 
