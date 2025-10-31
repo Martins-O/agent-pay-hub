@@ -9,6 +9,7 @@ import { AgentPayError } from '../errors/agentpay-error';
 import { createHash } from 'node:crypto';
 import { fetch } from 'undici';
 import { generateUlid } from '../utils/id';
+import { webhookDeliveriesTotal } from '../metrics/metrics';
 
 export interface WebhookDispatcherOptions {
   prisma: PrismaClient;
@@ -178,6 +179,8 @@ export class WebhookDispatcher {
         signatureUsed: signature
       }
     });
+
+    webhookDeliveriesTotal.labels(failureReason ? 'failure' : 'success').inc();
 
     if (failureReason) {
       await this.prisma.webhookRegistration.update({

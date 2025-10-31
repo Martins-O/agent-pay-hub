@@ -8,6 +8,7 @@ import requestIdPlugin from './plugins/request-id';
 import errorHandlerPlugin from './plugins/error-handler';
 import rateLimitPlugin from './plugins/rate-limit';
 import authPlugin from './plugins/auth';
+import metricsPlugin from './plugins/metrics';
 import { getPrismaClient, disconnectPrisma } from './persistence/prisma';
 import { getRedisClient, disconnectRedis } from './persistence/redis';
 import { registerHealthRoutes } from './routes/health';
@@ -26,6 +27,7 @@ import { registerPaymentRoutes } from './routes/payments';
 import { registerBalanceRoutes } from './routes/balances';
 import { registerWebhookRoutes } from './routes/webhooks';
 import { EventBus } from './events/event-bus';
+import { registry as metricsRegistry } from './metrics/registry';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const env = loadAppEnv();
@@ -59,6 +61,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(sensible);
   await app.register(requestIdPlugin);
   await app.register(errorHandlerPlugin);
+  await app.register(metricsPlugin);
 
   const rateLimitWindowMs = Math.max(
     Math.ceil((env.RATE_LIMIT_BUCKET_SIZE / env.RATE_LIMIT_REFILL_RATE) * 1000),
@@ -99,6 +102,11 @@ export async function buildApp(): Promise<FastifyInstance> {
   await registerPaymentRoutes(app, { paymentService, idempotencyService });
   await registerBalanceRoutes(app, { balanceService });
   await registerWebhookRoutes(app, { webhookService });
+  app.get('/metrics', { config: { public: true } }, async (_request, reply) => {
+    reply.header('content-type', metricsRegistry.contentType);
+    const metrics = await metricsRegistry.metrics();
+    return reply.send(metrics);
+  });
 
   app.setNotFoundHandler((request, reply) => {
     return reply.status(404).send({

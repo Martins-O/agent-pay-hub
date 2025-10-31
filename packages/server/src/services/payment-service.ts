@@ -22,9 +22,10 @@ import { AgentPayError } from '../errors/agentpay-error';
 import { parseWithZod } from '../utils/zod';
 import { X402Adapter } from '../adapters/x402-adapter';
 import { SolanaAdapter } from '../adapters/solana-adapter';
-import { LedgerService } from './ledger-service';
 import { AppEnv } from '../config';
 import { generateUlid } from '../utils/id';
+import { LedgerService } from './ledger-service';
+import { paymentsExecutedTotal } from '../metrics/metrics';
 
 export class PaymentService {
   constructor(
@@ -201,6 +202,7 @@ export class PaymentService {
     }
 
     const amountLamports = this.toLamports(invoice.assetSymbol, invoice.amount);
+    const metricsMode = simulateOnly || this.env.SOLANA_SIMULATION_ONLY ? 'simulation' : 'submit';
 
     const simulation = await this.solana.simulateTransfer({
       payer: payerWalletAddress,
@@ -211,6 +213,7 @@ export class PaymentService {
     });
 
     if (!simulation.success) {
+      paymentsExecutedTotal.labels(metricsMode, 'failed').inc();
       throw new AgentPayError({
         statusCode: 409,
         code: 'CONFLICT',
@@ -251,6 +254,10 @@ export class PaymentService {
       include: { invoice: true }
     });
 
+    if (metricsMode === 'submit') {
+      paymentsExecutedTotal.labels(metricsMode, 'pending').inc();
+    }
+
     await this.ledger.recordEvent({
       type: WebhookEventType.PAYMENT_SUBMITTED,
       invoiceId: invoice.id,
@@ -266,23 +273,32 @@ export class PaymentService {
     });
 
     if (simulateOnly || this.env.SOLANA_SIMULATION_ONLY) {
+      paymentsExecutedTotal.labels('simulation', 'simulated').inc();
       const dto = this.toDto(submittedPayment);
       return parseWithZod(executePaymentResponseSchema, { payment: dto });
     }
 
-    const submission = await this.solana.submitTransfer({
-      payer: payerWalletAddress,
-      recipient: invoice.recipientWalletAddress,
-      lamports: amountLamports,
-      memo: invoice.memo ?? undefined,
-      maxFeeLamports
-    });
+    let submission;
+    let confirmation;
 
-    const confirmation = await this.solana.confirmTransaction(
-      submission.signature,
-      submission.blockhash,
-      submission.lastValidBlockHeight
-    );
+    try {
+      submission = await this.solana.submitTransfer({
+        payer: payerWalletAddress,
+        recipient: invoice.recipientWalletAddress,
+        lamports: amountLamports,
+        memo: invoice.memo ?? undefined,
+        maxFeeLamports
+      });
+
+      confirmation = await this.solana.confirmTransaction(
+        submission.signature,
+        submission.blockhash,
+        submission.lastValidBlockHeight
+      );
+    } catch (error) {
+      paymentsExecutedTotal.labels(metricsMode, 'failed').inc();
+      throw error;
+    }
 
     submittedPayment = await this.prisma.payment.update({
       where: { id: submittedPayment.id },
@@ -317,6 +333,8 @@ export class PaymentService {
         slot: confirmation.slot
       }
     });
+
+    paymentsExecutedTotal.labels(metricsMode, 'confirmed').inc();
 
     const dto = this.toDto(submittedPayment);
     return parseWithZod(executePaymentResponseSchema, { payment: dto });

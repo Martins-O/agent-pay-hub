@@ -37,6 +37,8 @@ This log captures the current build state against the hackathon charter. It is m
   - Webhook service covering registration (with verification challenge), verification, listing (cursor pagination), soft deletion, delivery-attempt querying, and secret escrow (AES-GCM) + Argon2 hashing.
   - Webhook dispatcher listens to ledger events and delivers HMAC-signed payloads with exponential backoff, logging delivery attempts, and emitting success/failure events.
   - Routes: `POST /v1/webhooks`, `POST /v1/webhooks/:id/verify`, `GET /v1/webhooks`, `DELETE /v1/webhooks/:id`, `GET /v1/events/:eventId/deliveries`.
+- **Observability**
+  - Prometheus registry with `/metrics` export exposing default runtime stats plus HTTP duration, invoice creation, payment execution, and webhook delivery counters.
 - **TypeScript SDK**
   - `AgentPayClient` with typed helpers for invoices, payments, balances, and webhook management, idempotency key generation, and response validation.
   - Shared `AgentPayError` mapping server error envelopes, plus webhook signature verification helper using HMAC-SHA256.

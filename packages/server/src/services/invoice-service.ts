@@ -4,8 +4,9 @@ import { AgentIdentity } from '../auth/api-key-service';
 import { generateUlid } from '../utils/id';
 import { AppEnv } from '../config';
 import { X402Adapter } from '../adapters/x402-adapter';
-import { LedgerService } from './ledger-service';
 import { AgentPayError } from '../errors/agentpay-error';
+import { LedgerService } from './ledger-service';
+import { invoicesCreatedTotal } from '../metrics/metrics';
 
 interface InvoiceWithRelations extends Prisma.InvoiceGetPayload<{ include: { payments: true } }> {}
 
@@ -84,6 +85,8 @@ export class InvoiceService {
         agentId: agent.id
       }
     });
+
+    invoicesCreatedTotal.labels(payload.assetSymbol).inc();
 
     return this.toDto(created);
   }
