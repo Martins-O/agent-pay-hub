@@ -30,6 +30,11 @@ AgentPay Hub is an open-source MCP server that enables AI agents to create invoi
    pnpm dev
    ```
    The server binds to `http://localhost:8080` with simulation-only Solana behavior by default.
+4. Launch only the dashboard (optional) to interact with invoices, payments, and webhooks:
+   ```bash
+   pnpm --filter @agentpay/dashboard dev
+   ```
+   The app runs at `http://localhost:5173` and uses your locally stored API key to call the server.
 
 ### Quality Gates
 

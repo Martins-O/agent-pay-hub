@@ -9,12 +9,14 @@ import {
   getDeliveryAttemptsResponseSchema,
   getInvoiceResponseSchema,
   getPaymentResponseSchema,
+  listWebhookDeadLettersResponseSchema,
   listWebhooksResponseSchema,
   registerWebhookRequestSchema,
   registerWebhookResponseSchema,
   balanceResponseSchema,
   deleteWebhookResponseSchema,
   webhookRegistrationSchema,
+  replayWebhookDeadLetterResponseSchema,
   type CreateInvoiceRequest,
   type CreateInvoiceResponse,
   type ExecutePaymentResponse,
@@ -23,10 +25,12 @@ import {
   type GetDeliveryAttemptsResponse,
   type GetInvoiceResponse,
   type GetPaymentResponse,
+  type ListWebhookDeadLettersResponse,
   type BalanceResponse,
   type DeleteWebhookResponse,
   type RegisterWebhookResponse,
-  type WebhookRegistration
+  type WebhookRegistration,
+  type ReplayWebhookDeadLetterResponse
 } from '@agentpay/types';
 import { HttpClient, type HttpClientConfig } from '../internal/http';
 import { defaultIdempotencyKeyGenerator, type IdempotencyKeyGenerator } from '../utils/idempotency';
@@ -185,7 +189,29 @@ export class AgentPayClient {
       schema: getDeliveryAttemptsResponseSchema
     });
   }
+
+  async listWebhookDeadLetters(params: { cursor?: string; limit?: number } = {}): Promise<ListWebhookDeadLettersResponse> {
+    return this.http.request({
+      method: 'GET',
+      path: '/v1/webhooks/dlq',
+      query: {
+        cursor: params.cursor,
+        limit: params.limit
+      },
+      schema: listWebhookDeadLettersResponseSchema
+    });
+  }
+
+  async replayWebhookDeadLetter(deadLetterId: string): Promise<ReplayWebhookDeadLetterResponse> {
+    return this.http.request({
+      method: 'POST',
+      path: `/v1/webhooks/dlq/${deadLetterId}/replay`,
+      schema: replayWebhookDeadLetterResponseSchema
+    });
+  }
 }
 
 type CancelInvoiceResponse = z.infer<typeof cancelInvoiceResponseSchema>;
 type ListWebhooksResponse = z.infer<typeof listWebhooksResponseSchema>;
+type ListWebhookDeadLettersResponse = z.infer<typeof listWebhookDeadLettersResponseSchema>;
+type ReplayWebhookDeadLetterResponse = z.infer<typeof replayWebhookDeadLetterResponseSchema>;

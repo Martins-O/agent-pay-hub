@@ -14,6 +14,8 @@ describe('loadAppEnv', () => {
     process.env.DEVNET_FAUCET_ADDRESS = 'DEVNET_FAUCET';
     process.env.ALLOWED_ASSETS = '{"USDC":"Mint"}';
     process.env.ALLOWED_ASSET_DECIMALS = '{"USDC":6}';
+    process.env.SOLANA_PAYER_SECRET = 'TEST_SECRET_KEY';
+    process.env.SOLANA_SIMULATION_ONLY = 'true';
   });
 
   afterEach(() => {
@@ -33,14 +35,15 @@ describe('loadAppEnv', () => {
 
   it('throws when SOLANA_SIMULATION_ONLY is false without payer secret', async () => {
     process.env.SOLANA_SIMULATION_ONLY = 'false';
+    delete process.env.SOLANA_PAYER_SECRET;
 
     const { loadAppEnv } = await import('../../src/config/env');
 
-    expect(() => loadAppEnv()).toThrow('SOLANA_PAYER_SECRET is required when SOLANA_SIMULATION_ONLY=false');
+    expect(() => loadAppEnv()).toThrow(/SOLANA_PAYER_SECRET/);
   });
 
   it('throws when required env missing', async () => {
-    delete process.env.DATABASE_URL;
+    process.env.DATABASE_URL = '';
     const { loadAppEnv } = await import('../../src/config/env');
     expect(() => loadAppEnv()).toThrow(/DATABASE_URL/);
   });

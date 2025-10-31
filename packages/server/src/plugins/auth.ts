@@ -57,17 +57,17 @@ export default fp<AuthPluginOptions>(async function authPlugin(app: FastifyInsta
     request.agent = identity;
   });
 
-  app.addHook('onRequest', async (request, reply) => {
+  app.addHook('onRequest', async (request, _reply) => {
     const routeConfig = request.routeOptions?.config as { public?: boolean } | undefined;
 
     if (routeConfig?.public) {
       return;
     }
 
-    await app.authenticate(request, reply);
+    await app.authenticate(request, _reply);
   });
 
-  app.addHook('preHandler', async (request, reply) => {
+  app.addHook('preHandler', async (request, _reply) => {
     const routeConfig = request.routeOptions?.config as { public?: boolean } | undefined;
 
     if (routeConfig?.public) {
