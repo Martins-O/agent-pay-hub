@@ -1,5 +1,6 @@
 import type Redis from 'ioredis';
 import { AgentPayError } from '../errors/agentpay-error';
+import { walletNonceReplaysTotal } from '../metrics/metrics';
 
 const NONCE_PREFIX = 'agentpay:wallet-nonce';
 
@@ -15,6 +16,7 @@ export class NonceService {
     const result = await this.redis.set(cacheKey, '1', 'NX', 'EX', this.ttlSeconds);
 
     if (result === null) {
+      walletNonceReplaysTotal.inc();
       throw new AgentPayError({
         statusCode: 401,
         code: 'AUTH_INVALID_SIGNATURE',

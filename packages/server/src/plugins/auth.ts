@@ -5,6 +5,10 @@ import { AgentPayError } from '../errors/agentpay-error';
 import { WalletSignatureService } from '../services/wallet-signature-service';
 import { NonceService } from '../services/nonce-service';
 import { WalletAuthContext } from '../auth/types';
+import {
+  walletSignaturesVerifiedTotal,
+  walletSignatureFailuresTotal
+} from '../metrics/metrics';
 
 export interface AuthPluginOptions {
   authService: ApiKeyAuthService;
@@ -103,22 +107,35 @@ export default fp<AuthPluginOptions>(async function authPlugin(app: FastifyInsta
 
     const path = request.raw.url ?? request.url;
 
-    await walletSignatureService.verifySignature({
-      walletAddress,
-      nonce: walletNonce,
-      timestamp: walletTimestamp,
-      signature: walletSignature,
-      method: request.method,
-      path,
-      body: request.body
-    });
+    const routeLabel = request.routeOptions?.url ?? (request as { routerPath?: string }).routerPath ?? 'unknown';
 
-    await nonceService.consume(agent.id, walletAddress, walletNonce);
+    try {
+      await walletSignatureService.verifySignature({
+        walletAddress,
+        nonce: walletNonce,
+        timestamp: walletTimestamp,
+        signature: walletSignature,
+        method: request.method,
+        path,
+        body: request.body
+      });
 
-    request.walletIdentity = {
-      walletAddress,
-      nonce: walletNonce,
-      timestamp: walletTimestamp
-    };
+      await nonceService.consume(agent.id, walletAddress, walletNonce);
+
+      walletSignaturesVerifiedTotal.labels(request.method, routeLabel).inc();
+
+      request.walletIdentity = {
+        walletAddress,
+        nonce: walletNonce,
+        timestamp: walletTimestamp
+      };
+    } catch (error) {
+      if (error instanceof AgentPayError) {
+        walletSignatureFailuresTotal.labels(error.code).inc();
+      } else {
+        walletSignatureFailuresTotal.labels('UNEXPECTED').inc();
+      }
+      throw error;
+    }
   });
 });

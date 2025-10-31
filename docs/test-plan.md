@@ -15,6 +15,7 @@ The final test plan will enumerate unit, integration, chain, SDK, and end-to-end
   - Webhook registration, verification, and delivery with retry + DLQ.
   - Dead-letter listing and manual replay flows for failed webhook deliveries.
   - Admin endpoints for delivery attempts.
+  - API key + wallet signature authenticated requests across invoice, payment, and webhook flows.
 - **Chain Tests (Devnet)**
   - Happy path payment confirmation.
   - Insufficient funds, invalid recipients, expired invoice rejection.

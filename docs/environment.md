@@ -11,7 +11,7 @@ The following environment variables are required across packages. Example values
 - `DATABASE_POOL_MAX`: Maximum pool size for DB connections.
 - `CACHE_URL`: Redis connection string for nonce cache, rate limit counters, and idempotency keys.
 - `CACHE_NAMESPACE_TTL_INVOICE`: Seconds until invoice cache entries expire.
-- `CACHE_NAMESPACE_TTL_NONCE`: Seconds until nonce entries expire for replay defense.
+- `CACHE_NAMESPACE_TTL_NONCE`: Seconds until wallet signature nonces expire for replay defense.
 - `API_KEY_ENCRYPTION_SECRET`: Secret used to encrypt API key materials at rest.
 - `API_KEY_HASH_COST`: Argon2 cost parameter (JSON string or integer depending on library).
 - `RATE_LIMIT_BUCKET_SIZE`: Max tokens per API key.

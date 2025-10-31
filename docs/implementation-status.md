@@ -40,7 +40,7 @@ This log captures the current build state against the hackathon charter. It is m
   - Routes: `POST /v1/webhooks`, `POST /v1/webhooks/:id/verify`, `GET /v1/webhooks`, `DELETE /v1/webhooks/:id`, `GET /v1/events/:eventId/deliveries`.
   - Persistent dead-letter queue with listing and replay workflow (`GET /v1/webhooks/dlq`, `POST /v1/webhooks/dlq/:deadLetterId/replay`).
 - **Observability**
-  - Prometheus registry with `/metrics` export exposing default runtime stats plus HTTP duration, invoice creation, payment execution, and webhook delivery counters.
+  - Prometheus registry with `/metrics` export exposing default runtime stats plus HTTP duration, invoice creation, payment execution, webhook delivery, and wallet signature validation counters.
 - **TypeScript SDK**
   - `AgentPayClient` with typed helpers for invoices, payments, balances, and webhook management, idempotency key generation, and response validation.
   - Shared `AgentPayError` mapping server error envelopes, plus webhook signature verification helper using HMAC-SHA256.

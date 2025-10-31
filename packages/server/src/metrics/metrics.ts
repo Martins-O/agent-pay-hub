@@ -29,3 +29,23 @@ export const webhookDeliveriesTotal = new Counter({
   labelNames: ['outcome'],
   registers: [registry]
 });
+
+export const walletSignaturesVerifiedTotal = new Counter({
+  name: 'agentpay_wallet_signatures_verified_total',
+  help: 'Count of wallet signatures successfully verified',
+  labelNames: ['method', 'route'],
+  registers: [registry]
+});
+
+export const walletSignatureFailuresTotal = new Counter({
+  name: 'agentpay_wallet_signature_failures_total',
+  help: 'Count of wallet signature validation failures grouped by reason',
+  labelNames: ['reason'],
+  registers: [registry]
+});
+
+export const walletNonceReplaysTotal = new Counter({
+  name: 'agentpay_wallet_nonce_replays_total',
+  help: 'Count of wallet nonce replay attempts prevented',
+  registers: [registry]
+});

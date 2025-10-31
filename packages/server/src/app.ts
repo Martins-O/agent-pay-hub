@@ -84,6 +84,8 @@ export async function buildApp(): Promise<FastifyInstance> {
     walletSignatureService,
     nonceService
   });
+  app.decorate('walletSignatureService', walletSignatureService);
+  app.decorate('nonceService', nonceService);
 
   const eventBus = new EventBus();
   const x402Adapter = new X402Adapter(env);
