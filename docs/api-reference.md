@@ -16,6 +16,8 @@ This document will enumerate every MCP server endpoint, request/response schema,
   - `GET /v1/webhooks` – list webhooks with pagination.
   - `DELETE /v1/webhooks/:id` – deactivate webhook.
   - `GET /v1/events/:eventId/deliveries` – inspect delivery attempts for a specific event.
+  - `GET /v1/webhooks/dlq` – list outstanding webhook dead-letter entries.
+  - `POST /v1/webhooks/dlq/:deadLetterId/replay` – trigger a manual redelivery for a dead-lettered webhook.
   - Support endpoints for health, metrics, readiness.
     - `GET /health/liveness`
     - `GET /health/readiness`

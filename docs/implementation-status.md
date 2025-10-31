@@ -37,6 +37,7 @@ This log captures the current build state against the hackathon charter. It is m
   - Webhook service covering registration (with verification challenge), verification, listing (cursor pagination), soft deletion, delivery-attempt querying, and secret escrow (AES-GCM) + Argon2 hashing.
   - Webhook dispatcher listens to ledger events and delivers HMAC-signed payloads with exponential backoff, logging delivery attempts, and emitting success/failure events.
   - Routes: `POST /v1/webhooks`, `POST /v1/webhooks/:id/verify`, `GET /v1/webhooks`, `DELETE /v1/webhooks/:id`, `GET /v1/events/:eventId/deliveries`.
+  - Persistent dead-letter queue with listing and replay workflow (`GET /v1/webhooks/dlq`, `POST /v1/webhooks/dlq/:deadLetterId/replay`).
 - **Observability**
   - Prometheus registry with `/metrics` export exposing default runtime stats plus HTTP duration, invoice creation, payment execution, and webhook delivery counters.
 - **TypeScript SDK**
@@ -56,7 +57,6 @@ This log captures the current build state against the hackathon charter. It is m
   - Persist idempotency tokens/locks at the database layer to dedupe payment submissions and confirmed statuses.
 - **Webhooks**
   - Add webhook verification response endpoint (if required by external consumers) and optional handshake logging.
-  - Persist DLQ or manual replay controls; expose admin route to trigger replays.
   - Instrument dispatcher with metrics (delivery latency, success ratios) and structured logs.
 - **Ledger & Observability**
   - Expand ledger projections for balances/audit trail, add metrics exporters (Prometheus), and hook in tracing spans.

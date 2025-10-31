@@ -118,6 +118,7 @@ model WebhookRegistration {
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   deliveryAttempts  DeliveryAttempt[]
+  deadLetters       WebhookDeadLetter[]
 
   @@index([ownerAgentId])
   @@index([active])
@@ -152,6 +153,7 @@ model LedgerEvent {
   payload       Json
   createdAt     DateTime         @default(now())
   webhookAttempts DeliveryAttempt[]
+  deadLetterEntries WebhookDeadLetter[]
 
   @@index([eventType])
 }
@@ -164,4 +166,23 @@ model AuditLog {
   action      String
   context     Json
   createdAt   DateTime             @default(now())
+}
+
+model WebhookDeadLetter {
+  id             String               @id
+  registrationId String
+  registration   WebhookRegistration  @relation(fields: [registrationId], references: [id])
+  ledgerEventId  String
+  ledgerEvent    LedgerEvent          @relation(fields: [ledgerEventId], references: [id])
+  attemptCount   Int                  @default(0)
+  failureReason  String
+  body           String
+  bodyHash       String
+  lastAttemptAt  DateTime
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([registrationId])
+  @@index([ledgerEventId])
+  @@index([createdAt])
 }

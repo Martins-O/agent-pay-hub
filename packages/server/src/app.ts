@@ -87,15 +87,14 @@ export async function buildApp(): Promise<FastifyInstance> {
   const webhookService = new WebhookService(prisma, env);
   const idempotencyService = new IdempotencyService(redis, env.IDEMPOTENCY_TTL_SECONDS);
 
-  // initialize webhook dispatcher to react to ledger events
-  // eslint-disable-next-line no-new
-  new WebhookDispatcher({
+  const webhookDispatcher = new WebhookDispatcher({
     prisma,
     env,
     eventBus,
     webhookService,
     ledgerService
   });
+  app.decorate('webhookDispatcher', webhookDispatcher);
 
   await registerHealthRoutes(app);
   await registerInvoiceRoutes(app, { invoiceService, idempotencyService });

@@ -8,6 +8,8 @@ import {
   registerWebhookRequestSchema,
   registerWebhookResponseSchema,
   webhookRegistrationSchema,
+  webhookDeadLetterSchema,
+  listWebhookDeadLettersResponseSchema,
   type RegisterWebhookResponse,
   type WebhookRegistration,
   type GetDeliveryAttemptsResponse
@@ -126,6 +128,42 @@ export class WebhookService {
     return response;
   }
 
+  async listDeadLetters(
+    agent: AgentIdentity,
+    query: { cursor?: string; limit?: number }
+  ): Promise<z.infer<typeof listWebhookDeadLettersResponseSchema>> {
+    const take = query.limit ?? 20;
+    const cursor = query.cursor;
+
+    const records = await this.prisma.webhookDeadLetter.findMany({
+      where: {
+        registration: {
+          ownerAgentId: agent.id
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: take + 1,
+      ...(cursor
+        ? {
+            skip: 1,
+            cursor: {
+              id: cursor
+            }
+          }
+        : {})
+    });
+
+    const hasMore = records.length > take;
+    const sliced = hasMore ? records.slice(0, take) : records;
+
+    return parseWithZod(listWebhookDeadLettersResponseSchema, {
+      deadLetters: sliced.map((entry) => this.toDeadLetterDto(entry)),
+      nextCursor: hasMore ? records[records.length - 1].id : null
+    });
+  }
+
   async deleteWebhook(agent: AgentIdentity, registrationId: string): Promise<boolean> {
     await this.ensureOwnership(agent, registrationId);
 
@@ -217,6 +255,44 @@ export class WebhookService {
     return decryptSecret(registration.sharedSecretCiphertext, this.env.API_KEY_ENCRYPTION_SECRET);
   }
 
+  async getDeadLetterForReplay(
+    agent: AgentIdentity,
+    deadLetterId: string
+  ): Promise<Prisma.WebhookDeadLetterGetPayload<{ include: { registration: true } }>> {
+    const record = await this.prisma.webhookDeadLetter.findUnique({
+      where: { id: deadLetterId },
+      include: {
+        registration: true
+      }
+    });
+
+    if (!record || record.registration.ownerAgentId !== agent.id) {
+      throw new AgentPayError({
+        statusCode: 404,
+        code: 'NOT_FOUND',
+        message: 'Dead letter not found.'
+      });
+    }
+
+    return record;
+  }
+
+  async removeDeadLetter(deadLetterId: string): Promise<void> {
+    try {
+      await this.prisma.webhookDeadLetter.delete({
+        where: { id: deadLetterId }
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        return;
+      }
+      throw error;
+    }
+  }
+
   private async ensureOwnership(agent: AgentIdentity, registrationId: string) {
     const registration = await this.prisma.webhookRegistration.findUnique({
       where: { id: registrationId }
@@ -243,6 +319,23 @@ export class WebhookService {
       verificationNonce: model.verificationNonce,
       lastDeliveryAt: model.lastDeliveryAt ? model.lastDeliveryAt.toISOString() : null,
       failureCount: model.failureCount,
+      createdAt: model.createdAt.toISOString(),
+      updatedAt: model.updatedAt.toISOString()
+    });
+  }
+
+  private toDeadLetterDto(
+    model: Prisma.WebhookDeadLetterGetPayload<{ include?: never }>
+  ): z.infer<typeof webhookDeadLetterSchema> {
+    return parseWithZod(webhookDeadLetterSchema, {
+      id: model.id,
+      registrationId: model.registrationId,
+      eventId: model.ledgerEventId,
+      failureReason: model.failureReason,
+      attemptCount: model.attemptCount,
+      body: model.body,
+      bodyHash: model.bodyHash,
+      lastAttemptAt: model.lastAttemptAt.toISOString(),
       createdAt: model.createdAt.toISOString(),
       updatedAt: model.updatedAt.toISOString()
     });

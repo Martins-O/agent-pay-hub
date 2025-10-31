@@ -6,7 +6,9 @@ import {
   getDeliveryAttemptsResponseSchema,
   webhookRegistrationSchema,
   ulidSchema,
-  paginationSchema
+  paginationSchema,
+  listWebhookDeadLettersResponseSchema,
+  replayWebhookDeadLetterResponseSchema
 } from '@agentpay/types';
 import { WebhookService } from '../services/webhook-service';
 import { parseWithZod } from '../utils/zod';
@@ -88,6 +90,51 @@ export async function registerWebhookRoutes(
     const webhookId = parseWithZod(ulidSchema, params.webhookId);
     const success = await webhookService.deleteWebhook(agent, webhookId);
     return parseWithZod(deleteWebhookResponseSchema, { success });
+  });
+
+  app.get('/v1/webhooks/dlq', async (request) => {
+    const agent = request.agent;
+    if (!agent) {
+      throw new AgentPayError({
+        statusCode: 401,
+        code: 'AUTH_MISSING_API_KEY',
+        message: 'Authentication required.'
+      });
+    }
+
+    const query = parseWithZod(
+      paginationSchema.extend({
+        cursor: ulidSchema.optional()
+      }),
+      request.query
+    );
+
+    const response = await webhookService.listDeadLetters(agent, query);
+    return parseWithZod(listWebhookDeadLettersResponseSchema, response);
+  });
+
+  app.post('/v1/webhooks/dlq/:deadLetterId/replay', async (request) => {
+    const agent = request.agent;
+    if (!agent) {
+      throw new AgentPayError({
+        statusCode: 401,
+        code: 'AUTH_MISSING_API_KEY',
+        message: 'Authentication required.'
+      });
+    }
+
+    const params = request.params as Record<string, string>;
+    const deadLetterId = parseWithZod(ulidSchema, params.deadLetterId);
+    const deadLetter = await webhookService.getDeadLetterForReplay(agent, deadLetterId);
+
+    await request.server.webhookDispatcher.dispatchForRegistration(
+      deadLetter.registrationId,
+      deadLetter.ledgerEventId
+    );
+
+    await webhookService.removeDeadLetter(deadLetterId);
+
+    return parseWithZod(replayWebhookDeadLetterResponseSchema, { success: true });
   });
 
   app.get('/v1/events/:eventId/deliveries', async (request) => {

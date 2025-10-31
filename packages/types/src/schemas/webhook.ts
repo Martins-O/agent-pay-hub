@@ -67,6 +67,30 @@ export const getDeliveryAttemptsResponseSchema = z.object({
 
 export type GetDeliveryAttemptsResponse = z.infer<typeof getDeliveryAttemptsResponseSchema>;
 
+export const webhookDeadLetterSchema = z.object({
+  id: ulidSchema,
+  registrationId: ulidSchema,
+  eventId: ulidSchema,
+  failureReason: z.string(),
+  attemptCount: z.number().int().nonnegative(),
+  body: z.string(),
+  bodyHash: z.string(),
+  lastAttemptAt: iso8601Schema,
+  createdAt: iso8601Schema,
+  updatedAt: iso8601Schema
+});
+
+export type WebhookDeadLetter = z.infer<typeof webhookDeadLetterSchema>;
+
+export const listWebhookDeadLettersResponseSchema = z.object({
+  deadLetters: z.array(webhookDeadLetterSchema),
+  nextCursor: z.string().nullable()
+});
+
+export const replayWebhookDeadLetterResponseSchema = z.object({
+  success: z.boolean()
+});
+
 export const webhookEventPayloadSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('invoice.created'),

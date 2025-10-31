@@ -12,6 +12,7 @@ The final test plan will enumerate unit, integration, chain, SDK, and end-to-end
   - Payment simulation + submission path.
   - Balance queries with mocked Solana RPC.
   - Webhook registration, verification, and delivery with retry + DLQ.
+  - Dead-letter listing and manual replay flows for failed webhook deliveries.
   - Admin endpoints for delivery attempts.
 - **Chain Tests (Devnet)**
   - Happy path payment confirmation.

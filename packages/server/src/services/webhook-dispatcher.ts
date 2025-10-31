@@ -1,4 +1,4 @@
-import { PrismaClient, WebhookEventType } from '@prisma/client';
+import { Prisma, PrismaClient, WebhookEventType } from '@prisma/client';
 import { EventBus, LedgerEventMessage } from '../events/event-bus';
 import { AppEnv } from '../config';
 import { WebhookService } from './webhook-service';
@@ -98,16 +98,7 @@ export class WebhookDispatcher {
       return;
     }
 
-    const bodyPayload = {
-      id: fullEvent.id,
-      type: prismaToApiEventType[event.eventType],
-      invoiceId: fullEvent.invoiceId,
-      paymentId: fullEvent.paymentId,
-      createdAt: fullEvent.createdAt.toISOString(),
-      data: fullEvent.payload
-    };
-    const bodyString = JSON.stringify(bodyPayload);
-    const bodyHash = createHash('sha256').update(bodyString).digest('base64url');
+    const { body: bodyString, bodyHash } = this.createDeliveryPayload(fullEvent);
 
     await Promise.all(
       registrations.map((registration) =>
@@ -209,6 +200,15 @@ export class WebhookDispatcher {
         return;
       }
 
+      await this.recordDeadLetter({
+        registrationId,
+        eventId,
+        attempt,
+        failureReason,
+        body,
+        bodyHash
+      });
+
       await this.ledgerService.recordEvent({
         type: WebhookEventType.WEBHOOK_DELIVERY_FAILED,
         payload: {
@@ -229,12 +229,139 @@ export class WebhookDispatcher {
       }
     });
 
+    await this.clearDeadLetter(registrationId, eventId);
+
     await this.ledgerService.recordEvent({
       type: WebhookEventType.WEBHOOK_DELIVERY_SUCCEEDED,
       payload: {
         type: 'webhook.delivery.succeeded',
         eventId,
         registrationId
+      }
+    });
+  }
+
+  async dispatchForRegistration(registrationId: string, eventId: string): Promise<void> {
+    const registration = await this.prisma.webhookRegistration.findUnique({
+      where: { id: registrationId }
+    });
+
+    if (!registration) {
+      throw new AgentPayError({
+        statusCode: 404,
+        code: 'NOT_FOUND',
+        message: 'Webhook registration not found.'
+      });
+    }
+
+    const event = await this.prisma.ledgerEvent.findUnique({
+      where: { id: eventId },
+      include: {
+        invoice: true,
+        payment: {
+          include: {
+            invoice: true
+          }
+        }
+      }
+    });
+
+    if (!event) {
+      throw new AgentPayError({
+        statusCode: 404,
+        code: 'NOT_FOUND',
+        message: 'Ledger event not found.'
+      });
+    }
+
+    const { body, bodyHash } = this.createDeliveryPayload(event);
+
+    await this.dispatchWithRetry({
+      registrationId,
+      targetUrl: registration.targetUrl,
+      eventId: event.id,
+      eventType: event.eventType,
+      body,
+      bodyHash,
+      attempt: 1
+    });
+  }
+
+  private createDeliveryPayload(
+    event: Prisma.LedgerEventGetPayload<{
+      include: {
+        invoice: true;
+        payment: {
+          include: {
+            invoice: true;
+          };
+        };
+      };
+    }>
+  ): { body: string; bodyHash: string } {
+    const bodyPayload = {
+      id: event.id,
+      type: prismaToApiEventType[event.eventType],
+      invoiceId: event.invoiceId,
+      paymentId: event.paymentId,
+      createdAt: event.createdAt.toISOString(),
+      data: event.payload
+    };
+    const bodyString = JSON.stringify(bodyPayload);
+    const bodyHash = createHash('sha256').update(bodyString).digest('base64url');
+    return { body: bodyString, bodyHash };
+  }
+
+  private async recordDeadLetter(params: {
+    registrationId: string;
+    eventId: string;
+    attempt: number;
+    failureReason: string;
+    body: string;
+    bodyHash: string;
+  }): Promise<void> {
+    const existing = await this.prisma.webhookDeadLetter.findFirst({
+      where: {
+        registrationId: params.registrationId,
+        ledgerEventId: params.eventId
+      }
+    });
+
+    const now = new Date();
+
+    if (existing) {
+      await this.prisma.webhookDeadLetter.update({
+        where: { id: existing.id },
+        data: {
+          attemptCount: params.attempt,
+          failureReason: params.failureReason,
+          body: params.body,
+          bodyHash: params.bodyHash,
+          lastAttemptAt: now
+        }
+      });
+      return;
+    }
+
+    await this.prisma.webhookDeadLetter.create({
+      data: {
+        id: generateUlid(),
+        registrationId: params.registrationId,
+        ledgerEventId: params.eventId,
+        attemptCount: params.attempt,
+        failureReason: params.failureReason,
+        body: params.body,
+        bodyHash: params.bodyHash,
+        lastAttemptAt: now
+      }
+    });
+  }
+
+  private async clearDeadLetter(registrationId: string, eventId: string): Promise<void> {
+    await this.prisma.webhookDeadLetter.deleteMany({
+      where: {
+        registrationId,
+        ledgerEventId: eventId
       }
     });
   }
