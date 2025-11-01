@@ -9,8 +9,11 @@ import {
   type TransactionSignature
 } from '@solana/web3.js';
 import bs58 from 'bs58';
+import { Buffer } from 'node:buffer';
 import { AppEnv } from '../config';
 import { generateUlid } from '../utils/id';
+import { SignerManager } from './signer-manager';
+import { SolanaAdapterError } from './solana-errors';
 
 export interface SimulationDetails {
   logs: string[];
@@ -20,6 +23,7 @@ export interface SimulationDetails {
 
 export interface SimulationResult {
   success: boolean;
+  payer: string;
   error?: string;
   details: SimulationDetails;
 }
@@ -30,6 +34,7 @@ export interface SubmitResult {
   feeLamports?: number;
   blockhash: string;
   lastValidBlockHeight: number;
+  payer: string;
 }
 
 export interface ConfirmResult {
@@ -46,7 +51,7 @@ export interface BalanceResult {
 }
 
 export interface TransferRequest {
-  payer: string;
+  payer?: string;
   recipient: string;
   lamports: bigint;
   memo?: string;
@@ -60,7 +65,7 @@ interface BlockhashContext {
 
 export class SolanaAdapter {
   private readonly connection: Connection;
-  private readonly signer: Keypair | null;
+  private readonly signerManager: SignerManager | null;
 
   constructor(private readonly env: AppEnv) {
     this.connection = new Connection(env.SOLANA_RPC_ENDPOINT, {
@@ -68,20 +73,41 @@ export class SolanaAdapter {
     });
 
     if (env.SOLANA_SIMULATION_ONLY) {
-      this.signer = null;
+      this.signerManager = this.createSignerManager(env.SOLANA_PAYER_SECRETS);
     } else {
-      if (!env.SOLANA_PAYER_SECRET) {
-        throw new Error('SOLANA_PAYER_SECRET is required when SOLANA_SIMULATION_ONLY is false');
+      this.signerManager = this.createSignerManager(env.SOLANA_PAYER_SECRETS);
+      if (!this.signerManager || !this.signerManager.hasSigners()) {
+        throw new Error('At least one SOLANA_PAYER_SECRET is required when SOLANA_SIMULATION_ONLY=false');
       }
-
-      const secret = bs58.decode(env.SOLANA_PAYER_SECRET.trim());
-      this.signer = Keypair.fromSecretKey(secret);
     }
   }
 
+  selectPayer(requested?: string | null): string {
+    const trimmed = typeof requested === 'string' ? requested.trim() : '';
+
+    if (trimmed.length > 0) {
+      if (!this.env.SOLANA_SIMULATION_ONLY) {
+        const signer = this.signerManager?.getByAddress(trimmed);
+        if (!signer) {
+          throw new SolanaAdapterError('SIGNER_MISMATCH', 'No configured signer matches the provided payer wallet.', {
+            details: { payer: trimmed }
+          });
+        }
+      }
+      return trimmed;
+    }
+
+    if (!this.signerManager || !this.signerManager.hasSigners()) {
+      throw new SolanaAdapterError('SIGNER_NOT_AVAILABLE', 'Automatic payer selection requires at least one configured signer.');
+    }
+
+    return this.signerManager.getNext().publicKey.toBase58();
+  }
+
   async simulateTransfer(request: TransferRequest): Promise<SimulationResult> {
-    const signer = this.tryResolveSigner(request.payer);
-    const { transaction } = await this.prepareTransaction(request, undefined, signer?.publicKey);
+    const payerAddress = this.selectPayer(request.payer);
+    const signer = this.signerManager?.getByAddress(payerAddress) ?? null;
+    const { transaction } = await this.prepareTransaction({ ...request, payer: payerAddress }, undefined, signer?.publicKey);
 
     if (signer) {
       transaction.sign([signer]);
@@ -101,47 +127,70 @@ export class SolanaAdapter {
     if (simulation.value.err) {
       return {
         success: false,
+        payer: payerAddress,
         error: JSON.stringify(simulation.value.err),
         details
       };
     }
 
-    return { success: true, details };
+    return { success: true, payer: payerAddress, details };
   }
 
   async submitTransfer(request: TransferRequest): Promise<SubmitResult> {
+    const payerAddress = this.selectPayer(request.payer);
+
     if (this.env.SOLANA_SIMULATION_ONLY) {
       return {
         signature: `SIM-${generateUlid()}` as TransactionSignature,
         slot: 0,
         feeLamports: 0,
         blockhash: 'simulation',
-        lastValidBlockHeight: 0
+        lastValidBlockHeight: 0,
+        payer: payerAddress
       };
     }
 
-    const signer = this.requireSigner(request.payer);
-    const blockhashInfo = await this.connection.getLatestBlockhash(this.env.SOLANA_COMMITMENT_LEVEL);
-    const { transaction } = await this.prepareTransaction(request, blockhashInfo, signer.publicKey);
+    const signer = this.signerManager?.getByAddress(payerAddress);
+
+    if (!signer) {
+      throw new SolanaAdapterError('SIGNER_MISMATCH', 'No configured signer matches the provided payer wallet.', {
+        details: { payer: payerAddress }
+      });
+    }
+
+    const blockhashInfo = await this.getLatestBlockhash();
+
+    const { transaction } = await this.prepareTransaction(
+      { ...request, payer: payerAddress },
+      blockhashInfo,
+      signer.publicKey
+    );
 
     transaction.sign([signer]);
 
-    const feeForMessage = await this.connection.getFeeForMessage(
-      transaction.message,
-      this.env.SOLANA_COMMITMENT_LEVEL
-    );
+    const feeForMessage = await this.getFeeForMessage(transaction);
+    const estimatedFee = feeForMessage ?? undefined;
 
-    const signature = await this.connection.sendTransaction(transaction, {
-      skipPreflight: false,
-      maxRetries: 3
-    });
+    if (typeof estimatedFee === 'number' && request.maxFeeLamports !== undefined) {
+      if (BigInt(estimatedFee) > request.maxFeeLamports) {
+        throw new SolanaAdapterError('FEE_LIMIT_EXCEEDED', 'Estimated transaction fee exceeds the provided maxFeeLamports.', {
+          details: {
+            estimatedLamports: estimatedFee,
+            maxLamports: request.maxFeeLamports.toString()
+          }
+        });
+      }
+    }
+
+    const signature = await this.sendTransaction(transaction, signer);
 
     return {
       signature,
       slot: undefined,
-      feeLamports: feeForMessage?.value ?? undefined,
+      feeLamports: estimatedFee,
       blockhash: blockhashInfo.blockhash,
-      lastValidBlockHeight: blockhashInfo.lastValidBlockHeight
+      lastValidBlockHeight: blockhashInfo.lastValidBlockHeight,
+      payer: payerAddress
     };
   }
 
@@ -158,18 +207,38 @@ export class SolanaAdapter {
       };
     }
 
-    let confirmation;
-    if (blockhash && lastValidBlockHeight) {
-      confirmation = await this.connection.confirmTransaction(
-        {
-          signature,
-          blockhash,
-          lastValidBlockHeight
-        },
-        this.env.SOLANA_COMMITMENT_LEVEL
-      );
-    } else {
-      confirmation = await this.connection.confirmTransaction(signature, this.env.SOLANA_COMMITMENT_LEVEL);
+    const timeoutMs = this.env.SOLANA_TX_TIMEOUT_MS;
+
+    const confirmationPromise = (async () => {
+      if (blockhash && lastValidBlockHeight) {
+        return this.connection.confirmTransaction(
+          {
+            signature,
+            blockhash,
+            lastValidBlockHeight
+          },
+          this.env.SOLANA_COMMITMENT_LEVEL
+        );
+      }
+
+      return this.connection.confirmTransaction(signature, this.env.SOLANA_COMMITMENT_LEVEL);
+    })();
+
+    const confirmation = await this.withTimeout(confirmationPromise, timeoutMs).catch((error) => {
+      if (error instanceof SolanaAdapterError) {
+        throw error;
+      }
+      throw new SolanaAdapterError('RPC_CONFIRMATION_FAILED', 'Failed to confirm transaction.', { cause: error });
+    });
+
+    if (!confirmation) {
+      throw new SolanaAdapterError('RPC_CONFIRMATION_FAILED', 'Confirmation response was empty.');
+    }
+
+    if ((confirmation.value as { err?: unknown })?.err) {
+      throw new SolanaAdapterError('RPC_CONFIRMATION_FAILED', 'Transaction returned an error during confirmation.', {
+        details: { err: confirmation.value.err }
+      });
     }
 
     const status = confirmation.value?.confirmationStatus ?? this.env.SOLANA_COMMITMENT_LEVEL;
@@ -204,35 +273,94 @@ export class SolanaAdapter {
     };
   }
 
-  private tryResolveSigner(payerAddress: string): Keypair | null {
-    if (!this.signer) {
+  private createSignerManager(secrets: string[]): SignerManager | null {
+    if (secrets.length === 0) {
       return null;
     }
 
-    if (this.signer.publicKey.toBase58() !== payerAddress) {
-      return null;
-    }
+    const signers = secrets.map((secret) => {
+      const trimmed = secret.trim();
+      if (trimmed.length === 0) {
+        throw new Error('SOLANA_PAYER_SECRETS cannot contain empty values');
+      }
+      const decoded = bs58.decode(trimmed);
+      return Keypair.fromSecretKey(decoded);
+    });
 
-    return this.signer;
+    return new SignerManager(signers);
   }
 
-  private requireSigner(payerAddress: string): Keypair {
-    const signer = this.tryResolveSigner(payerAddress);
-    if (!signer) {
-      throw new Error('Configured signer does not match payer address or is unavailable');
+  private async getLatestBlockhash(): Promise<BlockhashContext> {
+    try {
+      return await this.connection.getLatestBlockhash(this.env.SOLANA_COMMITMENT_LEVEL);
+    } catch (error) {
+      throw new SolanaAdapterError('RPC_BLOCKHASH_FAILED', 'Failed to fetch latest blockhash from Solana RPC.', {
+        cause: error
+      });
     }
-    return signer;
+  }
+
+  private async getFeeForMessage(transaction: VersionedTransaction): Promise<number | null | undefined> {
+    try {
+      const feeForMessage = await this.connection.getFeeForMessage(
+        transaction.message,
+        this.env.SOLANA_COMMITMENT_LEVEL
+      );
+      return feeForMessage?.value ?? undefined;
+    } catch (error) {
+      throw new SolanaAdapterError('RPC_FEE_ESTIMATE_FAILED', 'Failed to estimate fee for transaction message.', {
+        cause: error
+      });
+    }
+  }
+
+  private async sendTransaction(transaction: VersionedTransaction, signer: Keypair): Promise<TransactionSignature> {
+    try {
+      return await this.connection.sendTransaction(transaction, {
+        skipPreflight: false,
+        maxRetries: 3,
+        preflightCommitment: this.env.SOLANA_COMMITMENT_LEVEL
+      });
+    } catch (error) {
+      throw new SolanaAdapterError('RPC_SEND_FAILED', 'Failed to submit transaction to Solana RPC.', {
+        cause: error,
+        details: {
+          feePayer: signer.publicKey.toBase58()
+        }
+      });
+    }
+  }
+
+  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+    let timeoutId: NodeJS.Timeout | undefined;
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        reject(
+          new SolanaAdapterError('RPC_CONFIRMATION_TIMEOUT', 'Transaction confirmation exceeded timeout.', {
+            details: { timeoutMs }
+          })
+        );
+      }, timeoutMs);
+    });
+
+    try {
+      return await Promise.race([promise, timeoutPromise]);
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    }
   }
 
   private async prepareTransaction(
     request: TransferRequest,
-    blockhashInfo?: BlockhashContext,
+    blockhashInfo: BlockhashContext | undefined,
     feePayerOverride?: PublicKey
   ): Promise<{ transaction: VersionedTransaction; blockhashInfo: BlockhashContext }> {
-    const info =
-      blockhashInfo ?? (await this.connection.getLatestBlockhash(this.env.SOLANA_COMMITMENT_LEVEL));
+    const info = blockhashInfo ?? (await this.connection.getLatestBlockhash(this.env.SOLANA_COMMITMENT_LEVEL));
 
-    const payerKey = feePayerOverride ?? new PublicKey(request.payer);
+    const payerKey = feePayerOverride ?? new PublicKey(request.payer ?? this.selectPayer());
     const recipientKey = new PublicKey(request.recipient);
 
     const instructions = [

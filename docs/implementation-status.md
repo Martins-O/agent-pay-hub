@@ -30,7 +30,7 @@ This log captures the current build state against the hackathon charter. It is m
   - Route: `GET /v1/balances/:walletAddress?asset=SYMBOL`.
 - **x402 & Solana Adapters**
   - x402 adapter for intent encode/decode, URI building, nonce generation.
-  - Solana adapter supports simulation-only mode and, when enabled, full transaction assembly, signing (via `SOLANA_PAYER_SECRET`), submission, confirmation polling, memo support, and fee estimation.
+  - Solana adapter supports simulation-only mode and, when enabled, full transaction assembly, signer rotation across `SOLANA_PAYER_SECRETS`, fee-limit guards, structured error mapping, submission, confirmation polling with timeouts, memo support, and fee estimation.
 - **Ledger & Eventing**
   - Ledger service records events and publishes to in-process `EventBus` abstraction.
   - Event bus wired to webhook dispatcher.
@@ -44,30 +44,30 @@ This log captures the current build state against the hackathon charter. It is m
 - **TypeScript SDK**
   - `AgentPayClient` with typed helpers for invoices, payments, balances, and webhook management, idempotency key generation, and response validation.
   - Shared `AgentPayError` mapping server error envelopes, plus webhook signature verification helper using HMAC-SHA256.
+- **Dashboard**
+  - React/Vite dashboard wiring the SDK for connectivity checks, invoice creation/cancel flows, payment simulation + lookup, balance inspection, webhook management (register/verify/delete), delivery attempt viewing, and DLQ replay, with local storage of API config.
 - **Documentation & Tracking**
   - Architecture, environment variable catalog, execution plan, acceptance criteria, test plan outline, demo script outline, and README status updated.
   - README includes SDK usage preview; API reference cross-links SDK examples.
-- **Testing (SDK)**
-  - Vitest configuration and unit coverage for HTTP client, idempotency helper, and webhook signature verifier (execution pending dependency install due to sandbox limits).
+- **Testing**
+  - Vitest suites cover server env loader, idempotency cache, wallet signature verifier, x402 adapter, plus SDK HTTP client/idempotency/webhook helpers (execution pending dependency install in sandbox).
 
 ## 🚧 In Progress / Remaining
 
 - **Solana & Payments Integration**
-  - Wire real transaction simulation/submit/confirm logic, wallet signer management, fee accounting, and error mapping into `SolanaAdapter`.
-  - Support commitment polling, timeout handling, multi-RPC failover, signature verification, and invoice expiry daemon based on on-chain state.
+  - Add multi-RPC failover, deeper commitment monitoring, signature verification, and invoice expiry daemon based on on-chain state.
   - Persist idempotency tokens/locks at the database layer to dedupe payment submissions and confirmed statuses.
 - **Webhooks**
-  - Add webhook verification response endpoint (if required by external consumers) and optional handshake logging.
+  - Persist webhook verification handshake logs and surface them via API/dashboard; add optional callback acknowledgements for external frameworks.
   - Instrument dispatcher with metrics (delivery latency, success ratios) and structured logs.
 - **Ledger & Observability**
   - Expand ledger projections for balances/audit trail, add metrics exporters (Prometheus), and hook in tracing spans.
 - **SDK**
-  - Add higher-level ergonomics (stream helpers, pagination iterators) and publish-ready metadata.
-  - Provide usage examples, docs, and automated tests (unit + integration) before packaging.
+  - Round out higher-level ergonomics (resource iterators beyond webhooks), publish metadata, and extend examples/reference docs before packaging.
 - **Dashboard**
-  - Build React/Vite dashboard flows (auth, invoice creation, payment simulation, webhook delivery viewer) leveraging shared SDK/types.
+  - Polish UX (responsive layouts, state persistence), add authenticated team workspaces, wire webhook delivery streaming, and prep onboarding guide content.
 - **Tests**
-  - Unit tests: schema validation, error mapper, idempotency cache, crypto helpers, webhook signature verification (server side).
+  - Unit tests: expand service/domain coverage (invoice/payment flows, webhook dispatcher, crypto edge cases) and add Solana adapter fallbacks.
   - Integration tests: invoice lifecycle, payment flow (simulation + confirm), balance query, webhook registration + delivery (mock HTTP sink).
   - Devnet chain tests for positive/negative payment cases once Solana adapter is real.
   - SDK integration tests (HTTP retries, pagination helpers) and dashboard e2e flows.

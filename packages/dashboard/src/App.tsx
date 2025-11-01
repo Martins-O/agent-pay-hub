@@ -7,6 +7,7 @@ import {
   type BalanceResponse,
   type WebhookRegistration,
   type WebhookDeadLetter,
+  type ExecutePaymentByInvoiceRequest,
   webhookEventTypeSchema
 } from '@agentpay/types';
 
@@ -430,16 +431,20 @@ function PaymentsPanel({ client }: { client: AgentPayClient }): JSX.Element {
       setExecuteError('');
 
       try {
-        const payload = {
+        const requestPayload: ExecutePaymentByInvoiceRequest = {
           invoiceId: form.invoiceId.trim(),
-          payerWalletAddress: form.payerWalletAddress.trim(),
           simulateOnly: form.simulateOnly
-        } as const;
-
-        const requestPayload = {
-          ...payload,
-          maxFeeLamports: form.maxFeeLamports.trim() ? form.maxFeeLamports.trim() : undefined
         };
+
+        const trimmedPayer = form.payerWalletAddress.trim();
+        if (trimmedPayer.length > 0) {
+          requestPayload.payerWalletAddress = trimmedPayer;
+        }
+
+        const trimmedMaxFee = form.maxFeeLamports.trim();
+        if (trimmedMaxFee.length > 0) {
+          requestPayload.maxFeeLamports = trimmedMaxFee;
+        }
 
         const response = await client.executePayment(requestPayload);
         setPaymentResult(response.payment);
@@ -515,9 +520,9 @@ function PaymentsPanel({ client }: { client: AgentPayClient }): JSX.Element {
               <span>Payer Wallet Address</span>
               <input
                 style={inputStyle}
-                required
                 value={form.payerWalletAddress}
                 onChange={(event) => setForm((prev) => ({ ...prev, payerWalletAddress: event.target.value }))}
+                placeholder="Leave blank for auto-managed signer"
               />
             </label>
             <label>

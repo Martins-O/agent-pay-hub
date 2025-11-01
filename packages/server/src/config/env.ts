@@ -42,6 +42,45 @@ const parseJsonRecord = <T>(
 const stringRecordSchema = z.record(z.string());
 const numberRecordSchema = z.record(z.number());
 
+const parseStringList = (input: unknown, fallback: string[]): string[] => {
+  if (typeof input === 'undefined' || input === null || input === '') {
+    return fallback;
+  }
+
+  if (typeof input === 'string') {
+    const trimmed = input.trim();
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (!Array.isArray(parsed)) {
+          throw new Error('Value must be an array');
+        }
+        return parsed.map((value) => {
+          if (typeof value !== 'string') {
+            return String(value);
+          }
+          return value;
+        });
+      } catch (error) {
+        throw new Error(`Invalid JSON provided: ${input}`);
+      }
+    }
+
+    return trimmed
+      .split(',')
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0);
+  }
+
+  if (Array.isArray(input)) {
+    return input
+      .map((value) => (typeof value === 'string' ? value : String(value)))
+      .filter((value) => value.length > 0);
+  }
+
+  throw new Error(`Unsupported value provided: ${String(input)}`);
+};
+
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   SERVER_HOST: z.string().default('0.0.0.0'),
@@ -77,6 +116,10 @@ const EnvSchema = z.object({
   SOLANA_TX_TIMEOUT_MS: z.coerce.number().int().positive().default(60000),
   SOLANA_SIMULATION_ONLY: booleanSchema.default(true),
   SOLANA_PAYER_SECRET: z.string().min(1).optional(),
+  SOLANA_PAYER_SECRETS: z
+    .unknown()
+    .transform((value) => parseStringList(value, []))
+    .default([]),
   DEVNET_FAUCET_ADDRESS: z.string().min(1, 'DEVNET_FAUCET_ADDRESS is required'),
   ALLOWED_ASSETS: z
     .unknown()
@@ -108,10 +151,29 @@ export function loadAppEnv(): AppEnv {
     throw new Error(`Environment validation failed: ${message}`);
   }
 
-  if (!parsed.data.SOLANA_SIMULATION_ONLY && !parsed.data.SOLANA_PAYER_SECRET) {
-    throw new Error('SOLANA_PAYER_SECRET is required when SOLANA_SIMULATION_ONLY=false');
+  const payerSecrets: string[] = [];
+
+  if (parsed.data.SOLANA_PAYER_SECRET) {
+    payerSecrets.push(parsed.data.SOLANA_PAYER_SECRET);
   }
 
-  cachedEnv = parsed.data;
-  return parsed.data;
+  if (parsed.data.SOLANA_PAYER_SECRETS.length > 0) {
+    for (const secret of parsed.data.SOLANA_PAYER_SECRETS) {
+      if (!payerSecrets.includes(secret)) {
+        payerSecrets.push(secret);
+      }
+    }
+  }
+
+  if (!parsed.data.SOLANA_SIMULATION_ONLY && payerSecrets.length === 0) {
+    throw new Error('SOLANA_PAYER_SECRET or SOLANA_PAYER_SECRETS is required when SOLANA_SIMULATION_ONLY=false');
+  }
+
+  const env: AppEnv = {
+    ...parsed.data,
+    SOLANA_PAYER_SECRETS: payerSecrets
+  };
+
+  cachedEnv = env;
+  return env;
 }

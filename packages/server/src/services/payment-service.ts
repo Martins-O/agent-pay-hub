@@ -22,6 +22,7 @@ import { AgentPayError } from '../errors/agentpay-error';
 import { parseWithZod } from '../utils/zod';
 import { X402Adapter } from '../adapters/x402-adapter';
 import { SolanaAdapter } from '../adapters/solana-adapter';
+import { isSolanaAdapterError } from '../adapters/solana-errors';
 import { AppEnv } from '../config';
 import { generateUlid } from '../utils/id';
 import { LedgerService } from './ledger-service';
@@ -138,12 +139,13 @@ export class PaymentService {
     agent: AgentIdentity,
     params: {
       invoice: Prisma.InvoiceGetPayload<{ include: { payments: true } }>;
-      payerWalletAddress: string;
+      payerWalletAddress?: string;
       maxFeeLamports?: bigint;
       simulateOnly: boolean;
     }
   ): Promise<ExecutePaymentResponse> {
-    const { invoice, payerWalletAddress, maxFeeLamports, simulateOnly } = params;
+    const { invoice, maxFeeLamports, simulateOnly } = params;
+    const requestedPayer = params.payerWalletAddress?.trim() || undefined;
 
     if (invoice.status === InvoiceStatus.PAID) {
       throw new AgentPayError({
@@ -169,7 +171,22 @@ export class PaymentService {
       });
     }
 
-    if (invoice.payerWalletAddress && invoice.payerWalletAddress !== payerWalletAddress) {
+    if (invoice.payerWalletAddress && requestedPayer && invoice.payerWalletAddress !== requestedPayer) {
+      throw new AgentPayError({
+        statusCode: 400,
+        code: 'VALIDATION_FAILED',
+        message: 'Payer wallet does not match invoice restrictions.'
+      });
+    }
+
+    let resolvedPayer: string;
+    try {
+      resolvedPayer = this.solana.selectPayer(requestedPayer ?? invoice.payerWalletAddress ?? null);
+    } catch (error) {
+      throw this.toPaymentError(error);
+    }
+
+    if (invoice.payerWalletAddress && invoice.payerWalletAddress !== resolvedPayer) {
       throw new AgentPayError({
         statusCode: 400,
         code: 'VALIDATION_FAILED',
@@ -205,7 +222,7 @@ export class PaymentService {
     const metricsMode = simulateOnly || this.env.SOLANA_SIMULATION_ONLY ? 'simulation' : 'submit';
 
     const simulation = await this.solana.simulateTransfer({
-      payer: payerWalletAddress,
+      payer: resolvedPayer,
       recipient: invoice.recipientWalletAddress,
       lamports: amountLamports,
       memo: invoice.memo ?? undefined,
@@ -237,7 +254,7 @@ export class PaymentService {
       id: paymentId,
       invoice: { connect: { id: invoice.id } },
       submittedBy: { connect: { id: agent.id } },
-      payerWalletAddress,
+      payerWalletAddress: resolvedPayer,
       recipientWalletAddress: invoice.recipientWalletAddress,
       onChainSignature: placeholderSignature,
       confirmationStatus: PaymentStatus.PENDING,
@@ -283,7 +300,7 @@ export class PaymentService {
 
     try {
       submission = await this.solana.submitTransfer({
-        payer: payerWalletAddress,
+        payer: resolvedPayer,
         recipient: invoice.recipientWalletAddress,
         lamports: amountLamports,
         memo: invoice.memo ?? undefined,
@@ -297,7 +314,7 @@ export class PaymentService {
       );
     } catch (error) {
       paymentsExecutedTotal.labels(metricsMode, 'failed').inc();
-      throw error;
+      throw this.toPaymentError(error);
     }
 
     submittedPayment = await this.prisma.payment.update({
@@ -376,5 +393,70 @@ export class PaymentService {
       submittedAt: payment.submittedAt ? payment.submittedAt.toISOString() : null,
       confirmedAt: payment.confirmedAt ? payment.confirmedAt.toISOString() : null
     });
+  }
+
+  private toPaymentError(error: unknown): Error {
+    if (!isSolanaAdapterError(error)) {
+      return error instanceof Error ? error : new Error(String(error));
+    }
+
+    const baseDetails = {
+      solanaCode: error.code,
+      ...(error.details ?? {})
+    };
+
+    switch (error.code) {
+      case 'SIGNER_MISMATCH':
+        return new AgentPayError({
+          statusCode: 400,
+          code: 'SOLANA_PAYER_INVALID',
+          message: 'Payer wallet is not recognized by the agent.',
+          retryable: false,
+          details: baseDetails
+        });
+      case 'SIGNER_NOT_AVAILABLE':
+        return new AgentPayError({
+          statusCode: 503,
+          code: 'SOLANA_SIGNER_UNAVAILABLE',
+          message: 'No Solana payer wallets are available at the moment.',
+          retryable: true,
+          details: baseDetails
+        });
+      case 'FEE_LIMIT_EXCEEDED':
+        return new AgentPayError({
+          statusCode: 400,
+          code: 'SOLANA_FEE_LIMIT_EXCEEDED',
+          message: 'Transaction fee estimate exceeds the provided maximum.',
+          retryable: false,
+          details: baseDetails
+        });
+      case 'RPC_CONFIRMATION_TIMEOUT':
+        return new AgentPayError({
+          statusCode: 504,
+          code: 'SOLANA_CONFIRMATION_TIMEOUT',
+          message: 'Transaction confirmation exceeded the configured timeout.',
+          retryable: true,
+          details: baseDetails
+        });
+      case 'RPC_BLOCKHASH_FAILED':
+      case 'RPC_FEE_ESTIMATE_FAILED':
+      case 'RPC_SEND_FAILED':
+      case 'RPC_CONFIRMATION_FAILED':
+        return new AgentPayError({
+          statusCode: 502,
+          code: 'SOLANA_RPC_ERROR',
+          message: 'Solana RPC error occurred while processing the transaction.',
+          retryable: true,
+          details: baseDetails
+        });
+      default:
+        return new AgentPayError({
+          statusCode: 502,
+          code: 'SOLANA_RPC_ERROR',
+          message: 'Unexpected Solana adapter error.',
+          retryable: true,
+          details: baseDetails
+        });
+    }
   }
 }

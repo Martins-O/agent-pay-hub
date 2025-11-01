@@ -29,7 +29,7 @@ export type Payment = z.infer<typeof paymentSchema>;
 
 export const executePaymentByInvoiceRequestSchema = z.object({
   invoiceId: ulidSchema,
-  payerWalletAddress: solanaAddressSchema,
+  payerWalletAddress: solanaAddressSchema.optional(),
   maxFeeLamports: decimalStringSchema.optional(),
   simulateOnly: z.boolean().optional()
 });
@@ -38,7 +38,7 @@ export type ExecutePaymentByInvoiceRequest = z.infer<typeof executePaymentByInvo
 
 export const executePaymentByIntentRequestSchema = z.object({
   x402Intent: z.string(),
-  payerWalletAddress: solanaAddressSchema,
+  payerWalletAddress: solanaAddressSchema.optional(),
   maxFeeLamports: decimalStringSchema.optional(),
   simulateOnly: z.boolean().optional()
 });

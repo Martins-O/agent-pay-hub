@@ -25,7 +25,8 @@ The following environment variables are required across packages. Example values
 - `SOLANA_COMMITMENT_LEVEL`: Commitment level for confirmations (e.g., `confirmed`).
 - `SOLANA_TX_TIMEOUT_MS`: Milliseconds before considering a transaction timed out.
 - `SOLANA_SIMULATION_ONLY`: `true` to disable submission (useful for smoke tests).
-- `SOLANA_PAYER_SECRET`: Base58-encoded secret key for the server-controlled payer (required when `SOLANA_SIMULATION_ONLY` is `false`).
+- `SOLANA_PAYER_SECRET`: Base58-encoded secret key for the server-controlled payer (required when `SOLANA_SIMULATION_ONLY` is `false` and no signer list is provided).
+- `SOLANA_PAYER_SECRETS`: JSON array or comma-separated list of additional payer secrets used for signer rotation. When present, the server round-robins these wallets; at least one secret (via either variable) is required for real submissions.
 - `DEVNET_FAUCET_ADDRESS`: Authority used to fund dev wallets.
 - `ALLOWED_ASSETS`: JSON map of allowed asset symbols to mint addresses.
 - `ALLOWED_ASSET_DECIMALS`: JSON map of asset symbols to decimals.

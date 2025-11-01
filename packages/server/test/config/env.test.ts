@@ -15,6 +15,7 @@ describe('loadAppEnv', () => {
     process.env.ALLOWED_ASSETS = '{"USDC":"Mint"}';
     process.env.ALLOWED_ASSET_DECIMALS = '{"USDC":6}';
     process.env.SOLANA_PAYER_SECRET = 'TEST_SECRET_KEY';
+    delete process.env.SOLANA_PAYER_SECRETS;
     process.env.SOLANA_SIMULATION_ONLY = 'true';
   });
 
@@ -36,10 +37,33 @@ describe('loadAppEnv', () => {
   it('throws when SOLANA_SIMULATION_ONLY is false without payer secret', async () => {
     process.env.SOLANA_SIMULATION_ONLY = 'false';
     delete process.env.SOLANA_PAYER_SECRET;
+    delete process.env.SOLANA_PAYER_SECRETS;
 
     const { loadAppEnv } = await import('../../src/config/env');
 
     expect(() => loadAppEnv()).toThrow(/SOLANA_PAYER_SECRET/);
+  });
+
+  it('supports SOLANA_PAYER_SECRETS list parsing', async () => {
+    process.env.SOLANA_PAYER_SECRET = 'base-secret';
+    process.env.SOLANA_SIMULATION_ONLY = 'false';
+    process.env.SOLANA_PAYER_SECRETS = 'sec-one,sec-two, sec-three';
+
+    const { loadAppEnv } = await import('../../src/config/env');
+    const env = loadAppEnv();
+
+    expect(env.SOLANA_PAYER_SECRETS).toEqual(['base-secret', 'sec-one', 'sec-two', 'sec-three']);
+  });
+
+  it('deduplicates secrets when both single and list provided', async () => {
+    process.env.SOLANA_SIMULATION_ONLY = 'false';
+    process.env.SOLANA_PAYER_SECRET = 'primary-secret';
+    process.env.SOLANA_PAYER_SECRETS = '["primary-secret", "secondary-secret"]';
+
+    const { loadAppEnv } = await import('../../src/config/env');
+    const env = loadAppEnv();
+
+    expect(env.SOLANA_PAYER_SECRETS).toEqual(['primary-secret', 'secondary-secret']);
   });
 
   it('throws when required env missing', async () => {
