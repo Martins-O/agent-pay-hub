@@ -21,19 +21,34 @@ copy_env "$ROOT_DIR/packages/dashboard/.env.example" "$ROOT_DIR/packages/dashboa
 
 if command -v docker >/dev/null 2>&1; then
   if docker compose version >/dev/null 2>&1; then
-    docker compose up -d postgres redis
+    COMPOSE_CMD=(docker compose)
   else
-    docker-compose up -d postgres redis
+    COMPOSE_CMD=(docker-compose)
   fi
+  "${COMPOSE_CMD[@]}" up -d postgres redis
 else
   echo "Docker is required to start Postgres and Redis." >&2
   exit 1
 fi
 
+echo "Waiting for Postgres to become ready..."
+ATTEMPTS=30
+until "${COMPOSE_CMD[@]}" exec -T postgres pg_isready -U agentpay -d agentpay -h localhost -p 5432 >/dev/null 2>&1; do
+  ATTEMPTS=$((ATTEMPTS - 1))
+  if [[ $ATTEMPTS -le 0 ]]; then
+    echo "Postgres did not become ready in time." >&2
+    exit 1
+  fi
+  sleep 1
+done
+
 echo "Applying database migrations..."
-pnpm --dir "$ROOT_DIR/packages/server" prisma migrate deploy --schema "$ROOT_DIR/packages/server/prisma/schema.prisma"
+pnpm --dir="$ROOT_DIR/packages/server" prisma migrate deploy --schema "$ROOT_DIR/packages/server/prisma/schema.prisma"
+
+echo "Generating Prisma client..."
+pnpm --dir="$ROOT_DIR/packages/server" prisma generate
 
 echo "Seeding development data..."
-pnpm --dir "$ROOT_DIR/packages/server" prisma db seed
+pnpm --dir="$ROOT_DIR/packages/server" prisma db seed
 
 echo "Bootstrap complete. API key details are logged during seeding if generated."
