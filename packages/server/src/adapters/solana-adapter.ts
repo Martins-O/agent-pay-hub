@@ -118,10 +118,19 @@ export class SolanaAdapter {
       commitment: this.env.SOLANA_COMMITMENT_LEVEL
     });
 
+    const simulationValue = simulation.value as {
+      logs?: string[] | null;
+      unitsConsumed?: number | null;
+      fee?: number | null;
+    };
+
     const details: SimulationDetails = {
-      logs: simulation.value.logs ?? [],
-      unitsConsumed: simulation.value.unitsConsumed ?? undefined,
-      estimatedFeeLamports: simulation.value.fee ?? undefined
+      logs: simulationValue.logs ?? [],
+      unitsConsumed: simulationValue.unitsConsumed ?? undefined,
+      estimatedFeeLamports:
+        simulationValue && typeof simulationValue.fee === 'number'
+          ? simulationValue.fee
+          : undefined
     };
 
     if (simulation.value.err) {
@@ -241,7 +250,8 @@ export class SolanaAdapter {
       });
     }
 
-    const status = confirmation.value?.confirmationStatus ?? this.env.SOLANA_COMMITMENT_LEVEL;
+    const confirmationValue = confirmation.value as { confirmationStatus?: ConfirmResult['status'] } | null;
+    const status = confirmationValue?.confirmationStatus ?? this.env.SOLANA_COMMITMENT_LEVEL;
 
     return {
       signature,

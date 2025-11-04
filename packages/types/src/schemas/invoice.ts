@@ -46,10 +46,16 @@ export const createInvoiceResponseSchema = z.object({
   invoice: invoiceSchema
 });
 
+export type CreateInvoiceResponse = z.infer<typeof createInvoiceResponseSchema>;
+
 export const getInvoiceResponseSchema = z.object({
   invoice: invoiceSchema
 });
 
+export type GetInvoiceResponse = z.infer<typeof getInvoiceResponseSchema>;
+
 export const cancelInvoiceResponseSchema = z.object({
   invoice: invoiceSchema
 });
+
+export type CancelInvoiceResponse = z.infer<typeof cancelInvoiceResponseSchema>;

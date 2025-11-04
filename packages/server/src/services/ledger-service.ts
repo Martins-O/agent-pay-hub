@@ -1,4 +1,4 @@
-import { PrismaClient, WebhookEventType } from '@prisma/client';
+import { PrismaClient, WebhookEventType, Prisma } from '@prisma/client';
 import { generateUlid } from '../utils/id';
 import { EventBus } from '../events/event-bus';
 
@@ -24,7 +24,7 @@ export class LedgerService {
         invoiceId: params.invoiceId,
         paymentId: params.paymentId,
         eventType: params.type,
-        payload: params.payload
+        payload: params.payload as Prisma.InputJsonValue
       }
     });
     this.eventBus.publishLedgerEvent({

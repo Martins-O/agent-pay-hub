@@ -39,25 +39,24 @@ export class PaymentService {
 
   async executePayment(agent: AgentIdentity, body: unknown): Promise<ExecutePaymentResponse> {
     const byInvoiceParse = executePaymentByInvoiceRequestSchema.safeParse(body);
-    const byIntentParse = executePaymentByIntentRequestSchema.safeParse(body);
-
-    if (!byInvoiceParse.success && !byIntentParse.success) {
-      throw new AgentPayError({
-        statusCode: 400,
-        code: 'VALIDATION_FAILED',
-        message: 'Invalid payment request payload.',
-        details: {
-          byInvoiceErrors: byInvoiceParse.success ? undefined : byInvoiceParse.error.flatten(),
-          byIntentErrors: byIntentParse.success ? undefined : byIntentParse.error.flatten()
-        }
-      });
-    }
-
     if (byInvoiceParse.success) {
       return this.executePaymentForInvoice(agent, byInvoiceParse.data);
     }
 
-    return this.executePaymentForIntent(agent, byIntentParse.data);
+    const byIntentParse = executePaymentByIntentRequestSchema.safeParse(body);
+    if (byIntentParse.success) {
+      return this.executePaymentForIntent(agent, byIntentParse.data);
+    }
+
+    throw new AgentPayError({
+      statusCode: 400,
+      code: 'VALIDATION_FAILED',
+      message: 'Invalid payment request payload.',
+      details: {
+        byInvoiceErrors: byInvoiceParse.error.flatten(),
+        byIntentErrors: byIntentParse.error.flatten()
+      }
+    });
   }
 
   async getPayment(agent: AgentIdentity, paymentId: string): Promise<GetPaymentResponse> {
@@ -261,7 +260,7 @@ export class PaymentService {
       feeEstimateLamports: simulation.details.estimatedFeeLamports
         ? BigInt(simulation.details.estimatedFeeLamports)
         : null,
-      simulationLogs: simulation.details,
+      simulationLogs: simulation.details as unknown as Prisma.InputJsonValue,
       submittedAt: null,
       confirmedAt: null
     };

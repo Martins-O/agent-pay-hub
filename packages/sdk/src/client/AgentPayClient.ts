@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import {
   cancelInvoiceResponseSchema,
   createInvoiceRequestSchema,
@@ -17,20 +16,22 @@ import {
   deleteWebhookResponseSchema,
   webhookRegistrationSchema,
   replayWebhookDeadLetterResponseSchema,
+  type BalanceResponse,
+  type CancelInvoiceResponse,
   type CreateInvoiceRequest,
   type CreateInvoiceResponse,
-  type ExecutePaymentResponse,
+  type DeleteWebhookResponse,
   type ExecutePaymentByIntentRequest,
   type ExecutePaymentByInvoiceRequest,
+  type ExecutePaymentResponse,
   type GetDeliveryAttemptsResponse,
   type GetInvoiceResponse,
   type GetPaymentResponse,
   type ListWebhookDeadLettersResponse,
-  type BalanceResponse,
-  type DeleteWebhookResponse,
+  type ListWebhooksResponse,
   type RegisterWebhookResponse,
-  type WebhookRegistration,
-  type ReplayWebhookDeadLetterResponse
+  type ReplayWebhookDeadLetterResponse,
+  type WebhookRegistration
 } from '@agentpay/types';
 import { HttpClient, type HttpClientConfig } from '../internal/http';
 import { defaultIdempotencyKeyGenerator, type IdempotencyKeyGenerator } from '../utils/idempotency';
@@ -210,8 +211,3 @@ export class AgentPayClient {
     });
   }
 }
-
-type CancelInvoiceResponse = z.infer<typeof cancelInvoiceResponseSchema>;
-type ListWebhooksResponse = z.infer<typeof listWebhooksResponseSchema>;
-type ListWebhookDeadLettersResponse = z.infer<typeof listWebhookDeadLettersResponseSchema>;
-type ReplayWebhookDeadLetterResponse = z.infer<typeof replayWebhookDeadLetterResponseSchema>;

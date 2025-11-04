@@ -23,8 +23,6 @@ export default fp<RateLimitPluginOptions>(async function rateLimitPlugin(app: Fa
       return request.ip;
     },
     skipOnError: false,
-    addHeadersOnSuccess: true,
-    addHeadersOnExceeding: true,
     hook: 'onRequest'
   });
 });

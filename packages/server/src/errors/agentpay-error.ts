@@ -6,7 +6,12 @@ export type AgentPayErrorCode =
   | 'VALIDATION_FAILED'
   | 'NOT_FOUND'
   | 'CONFLICT'
-  | 'INTERNAL_ERROR';
+  | 'INTERNAL_ERROR'
+  | 'SOLANA_PAYER_INVALID'
+  | 'SOLANA_SIGNER_UNAVAILABLE'
+  | 'SOLANA_FEE_LIMIT_EXCEEDED'
+  | 'SOLANA_CONFIRMATION_TIMEOUT'
+  | 'SOLANA_RPC_ERROR';
 
 export interface AgentPayErrorOptions {
   statusCode: number;

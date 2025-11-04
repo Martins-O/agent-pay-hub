@@ -32,7 +32,8 @@ export class HttpClient {
     this.baseUrl = config.baseUrl.replace(/\/$/, '');
     this.apiKey = config.apiKey;
     this.timeoutMs = config.timeoutMs ?? 15_000;
-    this.fetchImpl = config.fetchImpl ?? fetch;
+    const rawFetch = config.fetchImpl ?? fetch;
+    this.fetchImpl = rawFetch.bind(globalThis);
     this.defaultHeaders = config.defaultHeaders ?? {};
   }
 

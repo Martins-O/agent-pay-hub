@@ -1,10 +1,10 @@
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyBaseLogger } from 'fastify';
 import helmet from '@fastify/helmet';
 import cors from '@fastify/cors';
 import sensible from '@fastify/sensible';
+import { randomUUID } from 'node:crypto';
 import { createLogger } from './utils/logger';
 import { loadAppEnv } from './config';
-import requestIdPlugin from './plugins/request-id';
 import errorHandlerPlugin from './plugins/error-handler';
 import rateLimitPlugin from './plugins/rate-limit';
 import authPlugin from './plugins/auth';
@@ -34,8 +34,11 @@ import { registry as metricsRegistry } from './metrics/registry';
 export async function buildApp(): Promise<FastifyInstance> {
   const env = loadAppEnv();
   const logger = createLogger(env, { service: 'agentpay-server' });
-  const app = Fastify({
-    logger
+  const app: FastifyInstance = Fastify({
+    logger: logger as unknown as FastifyBaseLogger,
+    genReqId: () => randomUUID(),
+    requestIdHeader: 'x-request-id',
+    requestIdLogLabel: 'correlationId'
   });
 
   const prisma = getPrismaClient(env);
@@ -61,7 +64,6 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   await app.register(sensible);
-  await app.register(requestIdPlugin);
   await app.register(errorHandlerPlugin);
   await app.register(metricsPlugin);
 

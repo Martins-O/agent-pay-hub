@@ -1,5 +1,7 @@
 # API Reference (Outline)
 
+> Looking for step-by-step examples? See [API Guide](./api-guide.md) for sample requests and endpoint walk-throughs.
+
 This document will enumerate every MCP server endpoint, request/response schema, authentication requirements, idempotency behavior, rate limits, and error semantics. The structure will include:
 
 - **Authentication**: API key header (`x-api-key`) with optional wallet signature extension.

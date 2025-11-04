@@ -43,6 +43,8 @@ export const listWebhooksResponseSchema = z.object({
   nextCursor: z.string().nullable()
 });
 
+export type ListWebhooksResponse = z.infer<typeof listWebhooksResponseSchema>;
+
 export const deleteWebhookResponseSchema = z.object({
   success: z.boolean()
 });
@@ -87,9 +89,13 @@ export const listWebhookDeadLettersResponseSchema = z.object({
   nextCursor: z.string().nullable()
 });
 
+export type ListWebhookDeadLettersResponse = z.infer<typeof listWebhookDeadLettersResponseSchema>;
+
 export const replayWebhookDeadLetterResponseSchema = z.object({
   success: z.boolean()
 });
+
+export type ReplayWebhookDeadLetterResponse = z.infer<typeof replayWebhookDeadLetterResponseSchema>;
 
 export const webhookEventPayloadSchema = z.discriminatedUnion('type', [
   z.object({

@@ -13,7 +13,7 @@ export class NonceService {
 
   async consume(agentId: string, walletAddress: string, nonce: string): Promise<void> {
     const cacheKey = this.buildKey(agentId, walletAddress, nonce);
-    const result = await this.redis.set(cacheKey, '1', 'NX', 'EX', this.ttlSeconds);
+    const result = await this.redis.set(cacheKey, '1', 'EX', this.ttlSeconds, 'NX');
 
     if (result === null) {
       walletNonceReplaysTotal.inc();
